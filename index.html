@@ -1451,16 +1451,20 @@ function drawCourt(){
     ctx.strokeStyle = "rgba(255,138,61,.6)"; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(X(px), Y(py)); ctx.lineTo(X(0), Y(0)); ctx.stroke();
   });
-  // the sprayed line, rotated by the aim error about the shooter
+  // The sprayed line. Court axes are (lateral, out) while the sim works in
+  // (out, lateral) — opposite handedness — so rotate in world terms and map
+  // back, rather than reusing the formula and silently mirroring it.
   if(m.ok && Math.abs(m.alpha) > 1e-4){
-    const ux = (0-px)/m.p.L, uy = (0-py)/m.p.L;
+    const wx = py, wy = px;                                   // shooter, world frame
+    const uwx = -wx/m.p.L, uwy = -wy/m.p.L;
     const ca = Math.cos(m.alpha), sa = Math.sin(m.alpha);
-    const ax = ux*ca - uy*sa, ay = ux*sa + uy*ca;
+    const awx = uwx*ca + uwy*sa, awy = -uwx*sa + uwy*ca;
+    const endLat = wy + awy*m.p.L, endOut = wx + awx*m.p.L;
     ctx.strokeStyle = m.swishNow ? "rgba(61,220,151,.85)" : "rgba(255,93,93,.85)";
     ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(X(px), Y(py)); ctx.lineTo(X(px+ax*m.p.L), Y(py+ay*m.p.L)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(X(px), Y(py)); ctx.lineTo(X(endLat), Y(endOut)); ctx.stroke();
     ctx.fillStyle = m.swishNow ? "#3ddc97" : "#ff5d5d";
-    ctx.beginPath(); ctx.arc(X(px+ax*m.p.L), Y(py+ay*m.p.L), 3.5, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(X(endLat), Y(endOut), 3.5, 0, 7); ctx.fill();
   }
   ctx.fillStyle = "#ff8a3d";
   ctx.beginPath(); ctx.arc(X(px), Y(py), 6, 0, 7); ctx.fill();
@@ -1643,8 +1647,10 @@ function simulate(m, opts){
 
   const rel = shooterWorld(p, s);
   const ux = -rel.x/p.L, uy = -rel.y/p.L;                    // horizontal unit toward the hoop
+  // Sprayed by the aim error. The shooter faces the hoop from +x, so their
+  // right hand points to +y; a positive aim must therefore send the ball to +y.
   const ca = Math.cos(m.alpha), sa = Math.sin(m.alpha);
-  const ax = ux*ca - uy*sa, ay = ux*sa + uy*ca;              // sprayed by the aim error
+  const ax = ux*ca + uy*sa, ay = -ux*sa + uy*ca;
   const v0 = m.v * (1 + s.trim/100);
   // The speed stays the one solved for the nominal angle; the elevation error
   // tilts the launch off that solution, so the ball lands short or long.
@@ -1987,6 +1993,43 @@ function pushGhostBall(items, ctx, pr, m, P, kind){
   }});
 }
 
+/* Impact burst at a contact. Driven by playback time, so it fires as the
+ * playhead passes the event and replays on scrub — and stretches out nicely
+ * in slow motion. Sized from the ball radius so it scales with the camera. */
+const SPLASH_T = 0.30;
+function pushSplash(items, ctx, pr, m, e){
+  const age = pb.t - e.t;
+  if(age < 0 || age > SPLASH_T) return;
+  const a = pr(e); if(!a) return;
+  const k = age/SPLASH_T, fade = 1-k;
+  const col = e.type === "board" ? "#4cc9f0" : "#e0503a";
+  const base = Math.max(4, m.p.r*a.s);
+  const strength = clamp((e.speed||2)/5, 0.45, 1.6);      // harder hits splash bigger
+  items.push({d:a.z - 0.004, fn:()=>{
+    ctx.save();
+    ctx.globalAlpha = fade*0.9;
+    ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, 3.2*fade);
+    ctx.beginPath(); ctx.arc(a.x, a.y, base*(0.45 + 1.85*k*strength), 0, 7); ctx.stroke();
+    ctx.globalAlpha = fade*0.7;
+    ctx.lineWidth = Math.max(0.8, 2*fade);
+    const N = 9, r0 = base*(0.5 + 1.15*k*strength), r1 = base*(0.8 + 1.95*k*strength);
+    for(let i=0;i<N;i++){
+      const th = 2*Math.PI*i/N + k*0.45;
+      ctx.beginPath();
+      ctx.moveTo(a.x + r0*Math.cos(th), a.y + r0*Math.sin(th));
+      ctx.lineTo(a.x + r1*Math.cos(th), a.y + r1*Math.sin(th));
+      ctx.stroke();
+    }
+    if(k < 0.4){                                          // brief hot core
+      const kk = 1 - k/0.4;
+      ctx.globalAlpha = kk*0.6;
+      ctx.fillStyle = "#fff1dc";
+      ctx.beginPath(); ctx.arc(a.x, a.y, base*0.45*kk + 2, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+  }});
+}
+
 // Every contact already played, plus the ring-plane entry once it has happened.
 // The entry ghost is pinned at the crossing so it does not chase the ball in.
 function ghostMoments(m){
@@ -2010,32 +2053,57 @@ function ghostMoments(m){
 // The entry footprint: the ball's widest section laid FLAT in the ring plane at
 // rim height, so it reads as a horizontal disc however the camera is angled.
 // Shown once the ball is over the ring area, has touched iron, or has crossed.
-function pushEntryDisc(items, ctx, pr, m, A, lw){
-  const p = m.p, NC = 64;
-  const touched = m.sim && m.sim.events.some(e=>e.type==="rim" && e.t <= pb.t + 1e-6);
-  if(!(A.crossed || touched || A.off < p.R)) return false;
-  if(A.off > p.R + p.r) return false;          // wild miss: the footprint no longer meets the ring
-  const col = A.fit > 0 ? "#3ddc97" : "#ff5d5d";
-  const pts = [];
+// A circle of given radius lying flat in the ring plane, so it always reads as
+// horizontal however the camera is angled.
+function pushPlaneDisc(items, ctx, pr, m, cx, cy, rad, st){
+  const NC = 64, pts = [];
   for(let i=0;i<=NC;i++){
     const a = 2*Math.PI*i/NC;
-    pts.push(pr({x:A.x + p.r*Math.cos(a), y:A.y + p.r*Math.sin(a), z:p.H}));
+    pts.push(pr({x:cx + rad*Math.cos(a), y:cy + rad*Math.sin(a), z:m.p.H}));
   }
-  const zs = pts.filter(Boolean);
-  if(zs.length < NC*0.6) return false;
-  const depth = zs.reduce((s,q)=>s+q.z,0)/zs.length;
-  items.push({d:depth - 0.0007, fn:()=>{
+  const seen = pts.filter(Boolean);
+  if(seen.length < NC*0.6) return false;
+  const depth = seen.reduce((s,q)=>s+q.z,0)/seen.length;
+  items.push({d:depth + (st.dz||0), fn:()=>{
     ctx.save();
     ctx.beginPath();
     let started = false;
     for(const q of pts){ if(!q){ started=false; continue; } started?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y); started=true; }
     ctx.closePath();
-    ctx.globalAlpha = 0.16; ctx.fillStyle = col; ctx.fill();
-    ctx.globalAlpha = 1; ctx.strokeStyle = col; ctx.lineWidth = lw;
-    dash(ctx,[5,3],()=>ctx.stroke());
+    if(st.fill){ ctx.globalAlpha = st.alpha||0.16; ctx.fillStyle = st.fill; ctx.fill(); ctx.globalAlpha = 1; }
+    ctx.strokeStyle = st.stroke; ctx.lineWidth = st.lw||1.6;
+    if(st.dash) dash(ctx, st.dash, ()=>ctx.stroke()); else ctx.stroke();
     ctx.restore();
   }});
   return true;
+}
+
+function pushEntryDisc(items, ctx, pr, m, A, lw){
+  const p = m.p;
+  const touched = m.sim && m.sim.events.some(e=>e.type==="rim" && e.t <= pb.t + 1e-6);
+  if(!(A.crossed || touched || A.off < p.R)) return false;
+  if(A.off > p.R + p.r) return false;          // wild miss: the footprint no longer meets the ring
+  const col = A.fit > 0 ? "#3ddc97" : "#ff5d5d";
+  return pushPlaneDisc(items, ctx, pr, m, A.x, A.y, p.r,
+                       {stroke:col, fill:col, alpha:0.16, lw, dash:[5,3], dz:-0.0007});
+}
+
+/* How much of the ball sat below the rim surface at a contact.
+ * A sphere centred cz cuts the plane z = H in a circle of radius
+ *     rho = sqrt(r^2 - (cz - H)^2)
+ * and the depth of ball below that plane is  r - (cz - H). */
+function subRimSection(m, P){
+  const dz = P.z - m.p.H, r = m.p.r;
+  if(Math.abs(dz) >= r) return null;                    // clear of the plane entirely
+  return {rho: Math.sqrt(r*r - dz*dz), below: clamp(r - dz, 0, 2*r)};
+}
+function pushSubRimDisc(items, ctx, pr, m, P, kind){
+  const S = subRimSection(m, P);
+  if(!S || S.rho < 1e-4) return null;
+  const col = kind === "board" ? "#4cc9f0" : "#e0503a";
+  pushPlaneDisc(items, ctx, pr, m, P.x, P.y, S.rho,
+                {stroke:col, fill:col, alpha:0.26, lw:1.8, dz:-0.0009});
+  return S;
 }
 
 function roundRect(ctx, x, y, w, h, r){
@@ -2105,7 +2173,17 @@ function drawRimInset(ctx, W, H){
   // the crossing point rather than sliding away as the ball falls through.
   const A = rimCrossAnchor(m);
   const fit = A ? A.fit : null;
-  for(const g of ghostMoments(m)) pushGhostBall(items, ctx, pr, m, g, g.kind);
+  let deepest = null;
+  for(const e of sim.events){
+    if(e.type === "rim" || e.type === "board") pushSplash(items, ctx, pr, m, e);
+  }
+  for(const g of ghostMoments(m)){
+    pushGhostBall(items, ctx, pr, m, g, g.kind);
+    if(g.kind === "rim" || g.kind === "board"){
+      const Sx = pushSubRimDisc(items, ctx, pr, m, g, g.kind);
+      if(Sx && (!deepest || Sx.below > deepest.below)) deepest = Sx;
+    }
+  }
   if(A) pushEntryDisc(items, ctx, pr, m, A, 1.8);
 
   // where the ball's centre actually crosses the ring plane
@@ -2154,6 +2232,10 @@ function drawRimInset(ctx, W, H){
   label(ctx, "RIM CLOSE-UP", ix+9, iy+14, {color:"#8b9bb0", size:9.5, weight:"700"});
   label(ctx, "ghost = contact · flat disc = entry · "+fx(p.dball/IN,1)+"″ ball / "+fx(p.Drim/IN,1)+"″ ring",
         ix+9, iy+27, {color:"#5d6c80", size:9});
+  if(deepest){
+    label(ctx, fx(deepest.below*100,1)+" cm below the rim at contact",
+          ix+9, iy+ih-36, {color:"#e0913a", size:10, weight:"600"});
+  }
   if(fit !== null){
     label(ctx, fit > 0 ? fx(fit*100,1)+" cm of ring left on the near side"
                        : "overlaps the ring by "+fx(-fit*100,1)+" cm",
@@ -2275,7 +2357,14 @@ function drawScene(){
   // ---- ghost balls at every contact and at the entry point, plus the flat
   //      entry footprint. Shown during playback too, not only when paused. ----
   const A = rimCrossAnchor(m);
-  for(const g of ghostMoments(m)) pushGhostBall(items, ctx, pr, m, g, g.kind);
+  let deepest = null;
+  for(const g of ghostMoments(m)){
+    pushGhostBall(items, ctx, pr, m, g, g.kind);
+    if(g.kind === "rim" || g.kind === "board"){
+      const S = pushSubRimDisc(items, ctx, pr, m, g, g.kind);
+      if(S && (!deepest || S.below > deepest.below)) deepest = S;
+    }
+  }
   if(A) pushEntryDisc(items, ctx, pr, m, A, 2);
   if(!pb.playing && A){                          // clearance callout only when parked
     const lbl = pr({x:A.x, y:A.y, z:p.H});
@@ -2284,10 +2373,13 @@ function drawScene(){
             lbl.x, lbl.y+16, {color: A.fit>0?"#3ddc97":"#ff5d5d", size:10.5, align:"center", weight:"600"});
     }});
   }
+  if(deepest) label(ctx, fx(deepest.below*100,1)+" cm of ball dropped below the rim at contact",
+                    14, h-26, {color:"#e0913a", size:10.5, weight:"600"});
 
-  // ---- contact markers ----
+  // ---- contact markers + impact splash ----
   for(const e of sim.events){
     if(e.t > tNow + 1e-6 || e.type==="floor") continue;
+    if(e.type !== "through") pushSplash(items, ctx, pr, m, e);
     const a = pr(e); if(!a) continue;
     const col = e.type==="rim" ? "#e0503a" : e.type==="board" ? "#4cc9f0" : "#3ddc97";
     items.push({d:a.z-0.01, fn:()=>{

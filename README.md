@@ -255,7 +255,17 @@ Treat newtons as indicative: a real stroke recruits legs and is neither constant
 from the shooter's side, with the backboard in frame so the orientation is unambiguous. It draws
 both the entry offset from centre and the remaining gap to the near inner edge.
 
-Two markers make the moment legible, in the inset and in the paused main view:
+**Sub-rim section.** At a contact the ball usually straddles the ring plane. A sphere whose centre
+sits `dz` above that plane cuts it in a circle of radius `√(r² − dz²)`, with `r − dz` of ball below
+the surface. That circle is drawn filled, in the plane, at every rim and backboard contact — so you
+can see how much of the ball actually got under the rim, and read it off in centimetres. A shot
+that clips the *top* of the rim (`|dz| ≥ r`) correctly shows nothing.
+
+**Impact splash.** Contacts fire an expanding ring, spokes and a brief hot core, sized by the
+closing speed into the surface. It is keyed to playback time rather than wall-clock, so it replays
+when you scrub and stretches out under slow motion.
+
+Markers that make the moment legible, in the inset and in the main view:
 
 - **Ghost balls** — faint, true-size 3D balls frozen at every rim and backboard contact that has
   played, tinted per surface.
