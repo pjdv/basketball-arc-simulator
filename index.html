@@ -94,13 +94,14 @@
   .stack{display:flex;flex-direction:column;gap:18px;min-width:0}
   canvas{display:block;width:100%}
   #side{aspect-ratio:16/7.4}
-  @media (max-width:700px){#side{aspect-ratio:4/3}}
+  #detail{aspect-ratio:16/5.6}
+  @media (max-width:700px){#side{aspect-ratio:4/3} #detail{aspect-ratio:16/9}}
   #rim{aspect-ratio:1/1}
-  #chart{aspect-ratio:4/3}
+  #landing{aspect-ratio:1/1}
+  #chart{aspect-ratio:16/11}
   #court{aspect-ratio:1/1.12}
-  .trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
-  @media (max-width:1180px){.trio{grid-template-columns:1fr 1fr}}
-  @media (max-width:700px){.trio{grid-template-columns:1fr}}
+  .trio{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+  @media (max-width:760px){.trio{grid-template-columns:1fr}}
   #court{cursor:crosshair}
 
   /* metrics */
@@ -166,10 +167,25 @@
         </div>
       </section>
 
+      <section class="panel">
+        <h2>Through the rim — actual scale <em>ball and rim at true relative size, cut through the shooting plane</em></h2>
+        <canvas id="detail"></canvas>
+        <div class="legend">
+          <span><i style="background:#ff8a3d"></i>Ball on a perfect line</span>
+          <span><i style="background:rgba(139,155,176,.7)"></i>Ball grazing each edge</span>
+          <span><i style="background:#3ddc97"></i>Window between them</span>
+          <span><i style="background:#e0503a"></i>Rim edge (⅝″ steel)</span>
+        </div>
+      </section>
+
       <div class="trio">
         <section class="panel">
           <h2>Ball's-eye view <em>rim seen along the flight path</em></h2>
           <canvas id="rim"></canvas>
+        </section>
+        <section class="panel">
+          <h2>Landing map <em>where the ball crosses the rim plane</em></h2>
+          <canvas id="landing"></canvas>
         </section>
         <section class="panel">
           <h2>Room for error vs. launch angle</h2>
@@ -246,6 +262,90 @@ function windowFor(entry, Drim, dball){
   const se = Math.sin(entry);
   if(se <= 1e-6) return -1;
   return Drim - dball/se;
+}
+
+/* --- Left/right: the full 2-D acceptance region ---------------------
+ * For a ball centre crossing the rim plane at (x = depth along travel,
+ * y = lateral), the distance to the rim point at angle φ is
+ *     d²(φ) = sin²θₑ·(R·cos φ − x)² + (R·sin φ − y)²
+ * so the swish region is an ellipse (semi-axes R·sinθₑ × R) eroded by the
+ * ball radius — NOT two independent windows. Depth and lateral error trade
+ * off. On the depth axis this reduces to W = D − d/sin θₑ; on the lateral
+ * axis it equals D − d only while sin²θₑ ≥ d/D, i.e. above asin(√(d/D)).
+ * ------------------------------------------------------------------ */
+const RIM_SAMPLES = {};
+function rimSamples(n){
+  if(!RIM_SAMPLES[n]){
+    const a = [];
+    for(let i=0;i<n;i++){ const ph = 2*Math.PI*i/n; a.push([Math.cos(ph), Math.sin(ph)]); }
+    RIM_SAMPLES[n] = a;
+  }
+  return RIM_SAMPLES[n];
+}
+function minRimDist(x, y, sinE, R, n, refine){
+  const s2 = sinE*sinE, tab = rimSamples(n);
+  let bi = 0, best = Infinity;
+  for(let i=0;i<n;i++){
+    const dx = R*tab[i][0] - x, dy = R*tab[i][1] - y;
+    const v = s2*dx*dx + dy*dy;
+    if(v < best){ best = v; bi = i; }
+  }
+  if(!refine) return Math.sqrt(best);
+  const f = ph => { const dx = R*Math.cos(ph)-x, dy = R*Math.sin(ph)-y; return s2*dx*dx + dy*dy; };
+  let a = 2*Math.PI*(bi-1)/n, b = 2*Math.PI*(bi+1)/n;
+  for(let k=0;k<32;k++){
+    const m1 = a + (b-a)/3, m2 = b - (b-a)/3;
+    if(f(m1) < f(m2)) b = m2; else a = m1;
+  }
+  return Math.sqrt(f((a+b)/2));
+}
+
+// A clean pass needs BOTH conditions: the centre must cross inside the ring
+// (otherwise a wide airball trivially "clears" it), and it must stay a ball
+// radius away from the ring itself.
+function passesRim(x, y, sinE, p, n, refine){
+  if(Math.hypot(x, y) >= p.R) return false;
+  return minRimDist(x, y, sinE, p.R, n || 240, refine !== false) >= p.r;
+}
+
+// Spraying the shot by azimuth α leaves the vertical motion untouched, so the
+// ball still covers ground distance L — but along a rotated path. In the frame
+// aligned with travel that puts it long by L(1−cos α) and wide by L·sin α.
+const landingFor = (alpha, L) => ({ x: L*(1-Math.cos(alpha)), y: L*Math.sin(alpha) });
+
+function lateralWindow(p, sinE){
+  if(p.dball >= p.Drim) return 0;
+  let lo = 0, hi = p.R;
+  for(let k=0;k<44;k++){
+    const m = (lo+hi)/2;
+    if(passesRim(0, m, sinE, p)) lo = m; else hi = m;
+  }
+  return 2*lo;
+}
+
+function aimTolerance(p, sinE){
+  const test = a => { const q = landingFor(a, p.L); return passesRim(q.x, q.y, sinE, p); };
+  if(!test(0)) return 0;
+  let lo = 0, hi = 20*D2R;
+  if(test(hi)) return hi;
+  for(let k=0;k<36;k++){ const m = (lo+hi)/2; if(test(m)) lo = m; else hi = m; }
+  return lo;
+}
+
+// Star-shaped outline of the swish region about the rim centre.
+function acceptanceBoundary(p, sinE, rays){
+  if(!passesRim(0, 0, sinE, p)) return [];
+  const out = [];
+  for(let i=0;i<rays;i++){
+    const ps = 2*Math.PI*i/rays, cxr = Math.cos(ps), syr = Math.sin(ps);
+    let lo = 0, hi = p.R;
+    for(let k=0;k<15;k++){
+      const m = (lo+hi)/2;
+      if(passesRim(m*cxr, m*syr, sinE, p, 120, false)) lo = m; else hi = m;
+    }
+    out.push([lo*cxr, lo*syr]);
+  }
+  return out;
 }
 
 // Does this (v, th) swish? Each perturbed shot is judged by its own entry angle.
@@ -328,6 +428,8 @@ const CONTROLS = [
   ]},
   {group:"Shot", items:[
     {id:"angle",   label:"Launch angle",       min:20,  max:80,  step:0.5,  val:52,   fmt:v=>fx(v,1)+"°"},
+    {id:"aim",     label:"Aim error left/right", min:-3, max:3,  step:0.02, val:0,
+       fmt:v=>Math.abs(v)<0.005 ? "on line" : fx(Math.abs(v),2)+"° "+(v<0?"left":"right")},
     {id:"speed",   label:"Animation speed",    min:0.1, max:3,   step:0.1,  val:1,    fmt:v=>fx(v,1)+"×"}
   ]},
   {group:"Court & equipment", items:[
@@ -413,9 +515,21 @@ function recompute(){
       m.tFlight = cr.t;
       m.apex = p.h0 + (v*Math.sin(p.th))**2/(2*G);
       m.apexT = v*Math.sin(p.th)/G;
-      m.effOpen = p.Drim*Math.sin(m.entry);            // foreshortened depth of the rim
+      const sinE = Math.sin(m.entry);
+      m.effOpen = p.Drim*sinE;                         // foreshortened depth of the rim
       m.win = windowFor(m.entry, p.Drim, p.dball);     // depth window for the ball's centre
-      m.winLat = p.Drim - p.dball;                     // lateral window — arc-independent
+      m.winLat = lateralWindow(p, sinE);               // exact — only equals D−d above the threshold
+      m.latThresh = p.dball < p.Drim ? Math.asin(Math.sqrt(p.dball/p.Drim)) : null;
+      m.latIsMax  = m.latThresh !== null && m.entry >= m.latThresh - 1e-9;
+
+      // left/right aim error
+      m.alpha = s.aim*D2R;
+      m.land = landingFor(m.alpha, p.L);
+      m.clearance = minRimDist(m.land.x, m.land.y, sinE, p.R, 240, true);
+      m.inside = Math.hypot(m.land.x, m.land.y) < p.R;
+      m.swishNow = m.inside && m.clearance >= p.r;
+      m.aimTol = aimTolerance(p, sinE);
+      m.accept = acceptanceBoundary(p, sinE, 96);
       m.tolUp = angleTol(v, p.th, p, +1);
       m.tolDn = angleTol(v, p.th, p, -1);
       m.tolAng = Math.min(m.tolUp, m.tolDn);
@@ -486,6 +600,7 @@ function dash(ctx, arr, fn){ ctx.save(); ctx.setLineDash(arr); fn(); ctx.restore
  * ------------------------------------------------------------------ */
 function drawSide(){
   const {ctx, w, h} = fit(document.getElementById("side"));
+  if(w < 60 || h < 60) return;                     // collapsed/hidden container
   const m = model, p = m.p;
 
   const xMin = -0.7, xMax = p.L + 1.4;
@@ -623,10 +738,129 @@ function drawSide(){
 }
 
 /* ------------------------------------------------------------------ *
+ * 1b. Through the rim — true-scale cross-section
+ *
+ * Cut through the shooting plane at the rim. The ball travels along û =
+ * (cos θₑ, −sin θₑ); it grazes a rim edge when its centre passes exactly r
+ * away along the normal n̂ = (sin θₑ, cos θₑ). Projecting those two grazing
+ * centre-paths back onto the rim plane lands them at ∓(R − r/sin θₑ) — i.e.
+ * exactly ∓W/2, so this figure is the formula drawn out.
+ * ------------------------------------------------------------------ */
+function drawDetail(){
+  const {ctx, w, h} = fit(document.getElementById("detail"));
+  if(w < 60 || h < 60) return;                     // collapsed/hidden container
+  const m = model, p = m.p;
+  const e = m.ok ? m.entry : p.th;
+  const xSpan = 2*(p.R + 2.1*p.r), ySpan = 5.9*p.r;
+  const s = Math.min(((w-24)/2 - 18)/xSpan, (h-64)/ySpan);
+  const cy = h/2 + 2;
+
+  // same ball, same rim, two entry angles — the comparison is the argument
+  figure(ctx, w*0.25, cy, s, e,          "at your "+fx(e*R2D,1)+"° entry", true);
+  figure(ctx, w*0.75, cy, s, Math.PI/2,  "if it dropped straight down (90°)", false);
+
+  ctx.strokeStyle = "#1a2430"; ctx.lineWidth = 1;
+  dash(ctx,[4,6],()=>{ ctx.beginPath(); ctx.moveTo(w/2, 44); ctx.lineTo(w/2, h-16); ctx.stroke(); });
+
+  const pctHead = p.dball/p.Drim*100;
+  const pctEff  = p.dball/(p.Drim*Math.max(Math.sin(e),1e-3))*100;
+  label(ctx, "ball fills "+fx(pctHead,0)+"% of the rim head-on", 12, 16, {color:"#8b9bb0", size:11});
+  label(ctx, "…and "+(pctEff>100?">100":fx(pctEff,0))+"% of the "+fx(p.Drim*Math.max(Math.sin(e),1e-3)/IN,2)+
+             "″ opening it sees at "+fx(e*R2D,1)+"°",
+        12, 32, {color: (m.ok && m.win>0) ? "#3ddc97" : "#ff5d5d", size:11, weight:"600"});
+}
+
+function figure(ctx, cx, cy, s, e, caption, showAngle){
+  const p = model.p, R = p.R, r = p.r;
+  const sinE = Math.max(Math.sin(e), 1e-3), cosE = Math.cos(e);
+  const win = p.Drim - p.dball/sinE;
+  const open = win > 0;
+  const X = x => cx + x*s, Y = y => cy - y*s;
+  const ballR = r*s, tube = 0.0079*s;              // 5/8" rim stock
+
+  // rim plane
+  ctx.strokeStyle = "#22304a"; ctx.lineWidth = 1;
+  dash(ctx,[4,5],()=>{ ctx.beginPath(); ctx.moveTo(X(-(R+2*r)), Y(0)); ctx.lineTo(X(R+2*r), Y(0)); ctx.stroke(); });
+
+  // grazing centres: front edge is cleared above-and-past, back edge below-and-before
+  const gF = [-R + r*sinE,  r*cosE];
+  const gB = [ R - r*sinE, -r*cosE];
+  const ghost = (c)=>{
+    ctx.strokeStyle = "rgba(139,155,176,.7)"; ctx.lineWidth = 1.2;
+    dash(ctx,[4,4],()=>{ ctx.beginPath(); ctx.arc(X(c[0]), Y(c[1]), ballR, 0, 7); ctx.stroke(); });
+  };
+  ghost(gF); ghost(gB);
+
+  // the two boundary centre-paths
+  ctx.strokeStyle = "rgba(139,155,176,.28)"; ctx.lineWidth = 1;
+  for(const c of [gF, gB]){
+    const k = 1.8*r;
+    dash(ctx,[3,5],()=>{
+      ctx.beginPath();
+      ctx.moveTo(X(c[0]-k*cosE), Y(c[1]+k*sinE));
+      ctx.lineTo(X(c[0]+k*cosE), Y(c[1]-k*sinE));
+      ctx.stroke();
+    });
+  }
+
+  // rim edges, drawn as the steel they are
+  for(const ex of [-R, R]){
+    ctx.fillStyle = "#e0503a";
+    ctx.beginPath(); ctx.arc(X(ex), Y(0), Math.max(2.5, tube), 0, 7); ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  // the ball, true scale, on a perfect line
+  const g = ctx.createRadialGradient(X(0)-ballR*0.35, Y(0)-ballR*0.35, ballR*0.15, X(0), Y(0), ballR);
+  g.addColorStop(0, "#ffb06a"); g.addColorStop(1, "#d9622a");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(X(0), Y(0), ballR, 0, 7); ctx.fill();
+  ctx.strokeStyle = open ? "rgba(0,0,0,.45)" : "#ff5d5d"; ctx.lineWidth = open ? 1 : 2;
+  ctx.beginPath(); ctx.arc(X(0), Y(0), ballR, 0, 7); ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(X(0)-ballR, Y(0)); ctx.lineTo(X(0)+ballR, Y(0)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(X(0), Y(0)-ballR); ctx.lineTo(X(0), Y(0)+ballR); ctx.stroke();
+
+  // direction of travel
+  const aL = 1.75*r;
+  ctx.strokeStyle = "rgba(255,138,61,.85)"; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(X(-aL*cosE), Y(aL*sinE)); ctx.lineTo(X(aL*cosE), Y(-aL*sinE)); ctx.stroke();
+  const hx = X(aL*cosE), hy = Y(-aL*sinE), ah = 7;
+  ctx.fillStyle = "rgba(255,138,61,.85)";
+  ctx.beginPath();
+  ctx.moveTo(hx, hy);
+  ctx.lineTo(hx - ah*Math.cos(-e - 0.4), hy - ah*Math.sin(-e - 0.4));
+  ctx.lineTo(hx - ah*Math.cos(-e + 0.4), hy - ah*Math.sin(-e + 0.4));
+  ctx.closePath(); ctx.fill();
+  if(showAngle) label(ctx, fx(e*R2D,1)+"°", hx + 8, hy - 6, {color:"#ffb27a", size:10.5, weight:"600"});
+
+  // dimensions
+  const dimline = (x0, x1, y, color, txt, above)=>{
+    ctx.strokeStyle = color; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(x0), Y(y)); ctx.lineTo(X(x1), Y(y)); ctx.stroke();
+    for(const xx of [x0, x1]){ ctx.beginPath(); ctx.moveTo(X(xx), Y(y)-4); ctx.lineTo(X(xx), Y(y)+4); ctx.stroke(); }
+    label(ctx, txt, X((x0+x1)/2), Y(y) + (above ? -7 : 14), {color, size:10.5, align:"center", weight:"600"});
+  };
+  dimline(-R, R, -2.45*r, "#8b9bb0", "rim D = "+fx(p.Drim/IN,1)+"″ ("+fx(p.Drim*100,1)+" cm)", false);
+  dimline(-r, r,  1.75*r, "#ffb27a", "ball d = "+fx(p.dball/IN,1)+"″ ("+fx(p.dball*100,1)+" cm)", true);
+
+  if(open){
+    dimline(-win/2, win/2, -1.45*r, "#3ddc97",
+            "window W = "+fx(win/IN,2)+"″ ("+fx(win*100,1)+" cm)", false);
+  }else{
+    label(ctx, "no clearance — the ball cannot pass", cx, Y(-1.45*r)+14,
+          {color:"#ff5d5d", size:11, align:"center", weight:"600"});
+  }
+
+  label(ctx, caption, cx, Y(-2.45*r) + 34, {color:"#cfe0f2", size:11.5, align:"center", weight:"600"});
+}
+
+/* ------------------------------------------------------------------ *
  * 2. Ball's-eye view
  * ------------------------------------------------------------------ */
 function drawRimView(){
   const {ctx, w, h} = fit(document.getElementById("rim"));
+  if(w < 60 || h < 60) return;                     // collapsed/hidden container
   const m = model, p = m.p;
   const cx = w/2, cy = h/2 + 6;
   const R = Math.min(w, h)*0.33;
@@ -650,12 +884,23 @@ function drawRimView(){
   ctx.fill();
   ctx.strokeStyle = open ? "#3ddc97" : "#ff5d5d"; ctx.lineWidth = 2; ctx.stroke();
 
-  // ball cross-section
-  ctx.beginPath(); ctx.arc(cx, cy, rb, 0, 7);
+  // ball cross-section — drawn where this shot actually goes
+  const offX = m.ok ? m.land.y*sc : 0;              // lateral
+  const offY = m.ok ? -m.land.x*sinE*sc : 0;        // depth, foreshortened like the rim
+  if(m.ok && (Math.abs(offX) > 0.5 || Math.abs(offY) > 0.5)){
+    dash(ctx,[3,3],()=>{                            // where a perfect shot would sit
+      ctx.strokeStyle = "rgba(255,138,61,.35)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, rb, 0, 7); ctx.stroke();
+    });
+  }
+  const bx = cx + offX, by = cy + offY;
+  ctx.beginPath(); ctx.arc(bx, by, rb, 0, 7);
   ctx.fillStyle = "rgba(255,138,61,.85)"; ctx.fill();
-  ctx.strokeStyle = "#8a3f14"; ctx.lineWidth = 1; ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cx-rb, cy); ctx.lineTo(cx+rb, cy); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cx, cy-rb); ctx.lineTo(cx, cy+rb); ctx.stroke();
+  ctx.strokeStyle = (m.ok && !m.swishNow) ? "#ff5d5d" : "#8a3f14"; ctx.lineWidth = (m.ok && !m.swishNow) ? 2 : 1;
+  ctx.stroke();
+  ctx.strokeStyle = "#8a3f14"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(bx-rb, by); ctx.lineTo(bx+rb, by); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx, by-rb); ctx.lineTo(bx, by+rb); ctx.stroke();
 
   // depth clearance (top gap)
   const gapY = ry - rb, gapX = R - rb;
@@ -666,7 +911,7 @@ function drawRimView(){
   ctx.beginPath(); ctx.moveTo(cx+rb, cy); ctx.lineTo(cx+R, cy); ctx.stroke();
 
   const depthTxt = (gapY/sc*100);
-  label(ctx, (depthTxt>=0?"+":"")+fx(depthTxt,1)+" cm", cx+6, cy-(rb+ry)/2,
+  label(ctx, (depthTxt>=0?"+":"")+fx(depthTxt,1)+" cm", bx+6, cy-(rb+ry)/2,
         {color: gapY>0?"#3ddc97":"#ff5d5d", size:11, weight:"600", base:"middle"});
   label(ctx, fx(gapX/sc*100,1)+" cm", (cx+rb+cx+R)/2, cy-8, {color:"#4cc9f0", size:11, align:"center", weight:"600"});
 
@@ -680,13 +925,80 @@ function drawRimView(){
   label(ctx, "ball needs "+fx(p.dball/IN,1)+"″  →  "+(open ? "fits, "+fx(m.win/IN,2)+"″ of play" : "does not fit"),
         12, 34, {color: open ? "#3ddc97" : "#ff5d5d", size:11});
 
-  // the two clearances measure different things — say so explicitly
+  // the two gaps measure different things — say so explicitly
   if(m.ok && open){
     label(ctx, "green = clearance ⊥ to flight ("+fx(depthTxt,1)+" cm) → "+fx(m.win*100,1)+" cm of fore/aft landing room",
           cx, h-20, {color:"#5d6c80", size:10, align:"center"});
-    label(ctx, "blue = lateral clearance, fixed at (D−d)/2 whatever the arc",
+    label(ctx, "blue = gap to the ellipse's side; true side room is ±"+fx(m.winLat*50,1)+" cm"+
+               (m.latIsMax ? " (its max)" : " — shrunk below "+fx(m.latThresh*R2D,1)+"° entry"),
           cx, h-7, {color:"#5d6c80", size:10, align:"center"});
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * 2b. Landing map — the 2-D swish region, seen from above
+ * ------------------------------------------------------------------ */
+function drawLanding(){
+  const {ctx, w, h} = fit(document.getElementById("landing"));
+  if(w < 60 || h < 60) return;
+  const m = model, p = m.p;
+  const cx = w/2, cy = h/2 + 10;
+  const sc = Math.min(w-40, h-76)/(2*p.R*1.18);
+  const X = y => cx + y*sc;             // lateral →  screen x
+  const Y = x => cy - x*sc;             // depth (long = away) → screen up
+
+  // rim
+  ctx.strokeStyle = "#e0503a"; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(cx, cy, p.R*sc, 0, 7); ctx.stroke();
+
+  // axes
+  ctx.strokeStyle = "#1e2a3c"; ctx.lineWidth = 1;
+  dash(ctx,[3,5],()=>{
+    ctx.beginPath(); ctx.moveTo(X(-p.R*1.16), cy); ctx.lineTo(X(p.R*1.16), cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, Y(-p.R*1.16)); ctx.lineTo(cx, Y(p.R*1.16)); ctx.stroke();
+  });
+  label(ctx, "long",  cx, Y(p.R*1.16)-4, {color:"#4a5a70", size:9.5, align:"center"});
+  label(ctx, "short", cx, Y(-p.R*1.16)+12, {color:"#4a5a70", size:9.5, align:"center"});
+  label(ctx, "left",  X(-p.R*1.16)-4, cy, {color:"#4a5a70", size:9.5, align:"right", base:"middle"});
+  label(ctx, "right", X(p.R*1.16)+4, cy, {color:"#4a5a70", size:9.5, base:"middle"});
+
+  // the swish region
+  if(m.ok && m.accept && m.accept.length){
+    ctx.beginPath();
+    m.accept.forEach((q,i)=> i ? ctx.lineTo(X(q[1]), Y(q[0])) : ctx.moveTo(X(q[1]), Y(q[0])));
+    ctx.closePath();
+    ctx.fillStyle = "rgba(61,220,151,.20)"; ctx.fill();
+    ctx.strokeStyle = "#3ddc97"; ctx.lineWidth = 1.5; ctx.stroke();
+    label(ctx, "swish region", X(0), Y(m.win/2) - 8, {color:"rgba(61,220,151,.75)", size:9.5, align:"center"});
+  }else if(m.ok){
+    label(ctx, "no swish possible at this entry angle", cx, cy, {color:"#ff5d5d", size:11, align:"center", weight:"600"});
+  }
+
+  if(!m.ok) return;
+
+  // where this shot actually lands
+  const lx = X(m.land.y), ly = Y(m.land.x);
+  dash(ctx,[3,3],()=>{
+    ctx.strokeStyle = "rgba(255,138,61,.5)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(lx, ly, p.r*sc, 0, 7); ctx.stroke();
+  });
+  ctx.strokeStyle = "rgba(255,138,61,.55)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(lx, ly); ctx.stroke();
+  ctx.fillStyle = m.swishNow ? "#3ddc97" : "#ff5d5d";
+  ctx.beginPath(); ctx.arc(lx, ly, 4.5, 0, 7); ctx.fill();
+  ctx.strokeStyle = "#0a0e14"; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // verdict + the numbers behind it
+  const miss = Math.abs(m.land.y)*100;
+  label(ctx, m.swishNow ? "SWISH" : "NO SWISH", 12, 18,
+        {color: m.swishNow ? "#3ddc97" : "#ff5d5d", size:13, weight:"700"});
+  label(ctx, Math.abs(m.s.aim)<0.005 ? "dead on line"
+           : fx(miss,1)+" cm "+(m.land.y<0?"left":"right")+" at the rim",
+        12, 34, {color:"#8b9bb0", size:10.5});
+  label(ctx, "aim tolerance ±"+fx(m.aimTol*R2D,2)+"° (±"+fx(p.L*Math.sin(m.aimTol)*100,1)+" cm here)",
+        12, h-10, {color:"#8b9bb0", size:10.5});
+  label(ctx, "depth ±"+fx(m.win*50,1)+" cm · lateral ±"+fx(m.winLat*50,1)+" cm",
+        w-12, h-10, {color:"#5d6c80", size:10, align:"right"});
 }
 
 /* ------------------------------------------------------------------ *
@@ -694,6 +1006,7 @@ function drawRimView(){
  * ------------------------------------------------------------------ */
 function drawChart(){
   const {ctx, w, h} = fit(document.getElementById("chart"));
+  if(w < 60 || h < 60) return;                     // collapsed/hidden container
   const m = model, cur = m.curve;
   const L = 40, Rm = 42, T = 26, B = 66;
   const pw = w-L-Rm, phh = h-T-B;
@@ -782,6 +1095,7 @@ let courtMap = null;
 
 function drawCourt(){
   const {ctx, w, h} = fit(document.getElementById("court"));
+  if(w < 60 || h < 60) return;                     // collapsed/hidden container
   const m = model;
   const s = Math.min((w-16)/(COURT.xMax-COURT.xMin), (h-16)/(COURT.yMax-COURT.yMin));
   const ox = w/2, oy = 8 + (h-16 - (COURT.yMax-COURT.yMin)*s)/2 - COURT.yMin*s;
@@ -826,6 +1140,17 @@ function drawCourt(){
     ctx.strokeStyle = "rgba(255,138,61,.6)"; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(X(px), Y(py)); ctx.lineTo(X(0), Y(0)); ctx.stroke();
   });
+  // the sprayed line, rotated by the aim error about the shooter
+  if(m.ok && Math.abs(m.alpha) > 1e-4){
+    const ux = (0-px)/m.p.L, uy = (0-py)/m.p.L;
+    const ca = Math.cos(m.alpha), sa = Math.sin(m.alpha);
+    const ax = ux*ca - uy*sa, ay = ux*sa + uy*ca;
+    ctx.strokeStyle = m.swishNow ? "rgba(61,220,151,.85)" : "rgba(255,93,93,.85)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(X(px), Y(py)); ctx.lineTo(X(px+ax*m.p.L), Y(py+ay*m.p.L)); ctx.stroke();
+    ctx.fillStyle = m.swishNow ? "#3ddc97" : "#ff5d5d";
+    ctx.beginPath(); ctx.arc(X(px+ax*m.p.L), Y(py+ay*m.p.L), 3.5, 0, 7); ctx.fill();
+  }
   ctx.fillStyle = "#ff8a3d";
   ctx.beginPath(); ctx.arc(X(px), Y(py), 6, 0, 7); ctx.fill();
   ctx.strokeStyle = "rgba(255,138,61,.35)"; ctx.lineWidth = 2;
@@ -869,10 +1194,22 @@ function drawMetrics(){
   const push = (k, v, s, c="") => tiles.push('<div class="m"><div class="k">'+k+'</div><div class="v '+c+'">'+v+'</div><div class="s">'+(s||"&nbsp;")+'</div></div>');
 
   if(m.ok){
+    push("Outcome", m.swishNow ? "SWISH" : (m.inside ? "HITS RIM" : "MISSES HOOP"),
+         m.swishNow ? fx((m.clearance-p.r)*100,1)+" cm of clearance to spare"
+                    : (m.inside ? "clips the iron by "+fx((p.r-m.clearance)*100,1)+" cm"
+                                : fx((Math.hypot(m.land.x,m.land.y)-p.R)*100,1)+" cm outside the ring"),
+         m.swishNow ? "good" : "bad");
     push("Entry angle", fx(m.entry*R2D,1)+"°", "launched at "+fx(m.s.angle,1)+"°", cls(m.entry*R2D, 43, 35));
     push("Effective opening", fx(m.effOpen/IN,2)+"″", "D·sin θₑ  ·  "+fx(m.effOpen*100,1)+" cm", "cy");
     push("Swish window (depth)", (m.win>0?fx(m.win*100,1)+" cm":"closed"), (m.win>0?fx(m.win/IN,2)+"″ of fore/aft play":"ball cannot pass"), m.win>0?cls(m.win*100, 8, 3):"bad");
-    push("Swish window (lateral)", fx(m.winLat*100,1)+" cm", "fixed — arc doesn't help", "cy");
+    push("Swish window (lateral)", (m.winLat>0?fx(m.winLat*100,1)+" cm":"closed"),
+         m.latIsMax ? "at its max of D−d — arc can't help" : "below "+fx(m.latThresh*R2D,1)+"° entry, arc helps here too",
+         m.latIsMax ? "cy" : "warn");
+    push("Aim tolerance (L/R)", "±"+fx(m.aimTol*R2D,2)+"°",
+         "±"+fx(p.L*Math.sin(m.aimTol)*100,1)+" cm at "+fx(p.L,2)+" m", cls(m.aimTol*R2D, 1.0, 0.5));
+    push("Lateral miss", Math.abs(m.s.aim)<0.005 ? "on line" : fx(Math.abs(m.land.y)*100,1)+" cm",
+         Math.abs(m.s.aim)<0.005 ? "aim error 0.00°" : fx(Math.abs(m.s.aim),2)+"° "+(m.land.y<0?"left":"right"),
+         Math.abs(m.s.aim)<0.005 ? "cy" : (m.swishNow ? "good" : "bad"));
     push("Angular tolerance", "±"+fx(m.tolAng*R2D,2)+"°", "+"+fx(m.tolUp*R2D,2)+"° / −"+fx(m.tolDn*R2D,2)+"°", cls(m.tolAng*R2D, 1.0, 0.4));
     push("Velocity tolerance", "±"+fx(m.tolVel/m.v*100,2)+"%", "+"+fx(m.vUp/m.v*100,2)+"% / −"+fx(m.vDn/m.v*100,2)+"%", cls(m.tolVel/m.v*100, 2.0, 0.8));
     push("Required velocity", fx(m.v,2)+" m/s", fx(m.v*2.23694,1)+" mph", "or");
@@ -883,7 +1220,7 @@ function drawMetrics(){
     push("Min-force angle", fx(m.thOpt*R2D,1)+"°", "also peak angular tolerance");
     push("Same-force angle", m.companion ? fx(m.companion*R2D,1)+"°" : "none", m.companion ? "the other arc at this speed" : "single solution");
   }else{
-    for(let i=0;i<12;i++) push("—","—","");
+    for(let i=0;i<15;i++) push("—","—","");
   }
   document.getElementById("metrics").innerHTML = tiles.join("");
 }
@@ -921,11 +1258,21 @@ function drawExplain(){
     "</div>"
   );
 
+  const thr = m.latThresh ? fx(m.latThresh*R2D,1) : "—";
   html.push(
-    "<div><h4>3 · Arc only helps in one direction</h4>"+
-    "<p>Steepening the shot stretches the ellipse's <em>depth</em> and does nothing for its width. The left/right window is "+
-    "<strong>D − d = "+fx((p.Drim-p.dball)*100,1)+" cm</strong> at every angle, forever. Arc forgives shooting long or short; only aim forgives shooting wide.</p>"+
-    "<p>That's why the ball's-eye ellipse is always wider than it is deep, and why only the depth clearance moves when you drag the angle slider.</p></div>"
+    "<div><h4>3 · Left and right is a different problem</h4>"+
+    "<p>The swish region isn't two independent windows — it's the rim's ellipse <strong>eroded by the ball</strong>, so depth and "+
+    "lateral error <em>trade off</em>. Miss a little long and you have less room left or right. That's the shape drawn in the landing map.</p>"+
+    '<span class="eq">d²(φ) = sin²θₑ·(D/2·cos φ − x)² + (D/2·sin φ − y)²\nswish  ⇔  min over φ of d(φ) ≥ ball radius</span>'+
+    "<p>On the pure left/right axis the window is <strong>D − d = "+fx((p.Drim-p.dball)*100,1)+" cm</strong> — but only while "+
+    "sin²θₑ ≥ d/D, i.e. above <strong>"+thr+"° of entry</strong>. "+
+    (m.latIsMax
+      ? "You're above it, so here arc genuinely does nothing for left/right: the lateral window is at its ceiling of "+fx(m.winLat*100,1)+" cm."
+      : "You're <em>below</em> it, so the lateral window has already shrunk to <strong>"+fx(m.winLat*100,1)+" cm</strong> — at shallow entry a wide ball clips the near rim on the diagonal, and arc starts helping sideways too.")+
+    "</p>"+
+    "<p>The catch is that lateral room is a fixed <em>distance</em>, so the angular precision it demands scales as 1/L. At "+fx(p.L,2)+
+    " m you get <strong>±"+fx(m.aimTol*R2D,2)+"°</strong> of aim; step back and that shrinks in proportion while arc can do nothing about it. "+
+    "Beyond mid-range, left/right aim — not arc — is what's missing shots.</p></div>"
   );
 
   html.push(
@@ -956,17 +1303,29 @@ function drawExplain(){
 /* ------------------------------------------------------------------ *
  * Loop & wiring
  * ------------------------------------------------------------------ */
-function drawStatic(){ drawRimView(); drawChart(); drawCourt(); drawMetrics(); drawExplain(); }
+// DOM panels first, so a canvas failure can never leave the numbers stale.
+// drawSide is included so a resize still lands even when rAF is throttled
+// (background tab) — it is otherwise refreshed by the animation loop.
+function drawStatic(){
+  drawMetrics(); drawExplain();
+  for(const fn of [drawSide, drawDetail, drawRimView, drawLanding, drawChart, drawCourt]){
+    try{ fn(); }catch(err){ console.error(fn.name+" failed:", err); }
+  }
+}
 function restart(){ anim.t = 0; }
 
 let last = performance.now();
 function frame(now){
-  const dt = Math.min(0.05, (now-last)/1000); last = now;
-  if(model && model.ok && anim.playing){
-    anim.t += dt*model.s.speed;
-    if(anim.t > model.pathT) anim.t = 0;
+  try{
+    const dt = Math.min(0.05, (now-last)/1000); last = now;
+    if(model && model.ok && anim.playing){
+      anim.t += dt*model.s.speed;
+      if(anim.t > model.pathT) anim.t = 0;
+    }
+    if(model) drawSide();
+  }catch(err){
+    console.error("frame failed:", err);        // never let one bad frame kill the loop
   }
-  if(model) drawSide();
   requestAnimationFrame(frame);
 }
 

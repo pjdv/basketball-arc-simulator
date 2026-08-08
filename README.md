@@ -81,11 +81,53 @@ center crosses the rim plane within
 
 ```
 depth window   W = D_rim − d_ball / sin θₑ      (shrinks as the shot flattens)
-lateral window     D_rim − d_ball               (constant — arc does not help here)
 ```
 
-That asymmetry is the whole lesson: **arc buys you depth tolerance and nothing else.** Left/right
-misses are governed by aim alone.
+### 3b. Left and right — the full 2-D region
+
+Treating left/right as a second independent window is wrong. For a ball centre crossing the rim
+plane at `(x, y)` (depth along travel, lateral), the distance to the rim point at angle `φ` is
+
+```
+d²(φ) = sin²θₑ·(R·cos φ − x)² + (R·sin φ − y)²
+swish ⇔ the centre crosses inside the ring AND min over φ of d(φ) ≥ ball radius
+```
+
+So the acceptance region is the rim's **ellipse (semi-axes `R·sinθₑ × R`) eroded by the ball
+radius** — a lens, not a rectangle. Depth and lateral error **trade off**: miss slightly long and
+you have less room left or right. On the depth axis this reduces exactly to `W` above.
+
+On the lateral axis it equals `D − d` **only while `sin²θₑ ≥ d/D`**, i.e. above
+
+```
+θ_lateral = asin(√(d/D)) = asin(√(9.4/18)) = 46.3°
+```
+
+Above that, arc genuinely does nothing for left/right. Below it, a wide ball starts clipping the
+near rim on the diagonal and the lateral window collapses too:
+
+| Entry angle | Lateral window | vs. `D − d` = 21.8 cm |
+|---|---|---|
+| ≥ 46.3° | 21.84 cm | at its maximum |
+| 42.6° | 21.41 cm | −0.4 cm |
+| 40° | 20.42 cm | −1.4 cm |
+| 35° | 15.49 cm | −6.4 cm |
+| 33° | 10.89 cm | −11.0 cm |
+
+The practical point: lateral room is a fixed **distance**, so the aim *precision* it demands scales
+as `1/L`. The **Aim error left/right** slider sprays the shot by an azimuth `α`, which lands the
+ball wide by `L·sin α` and long by `L(1 − cos α)`:
+
+| Distance | Aim tolerance | Lateral room at the rim |
+|---|---|---|
+| 1 m | ±5.94° | ±10.4 cm |
+| 3 m | ±2.02° | ±10.6 cm |
+| 5 m | ±1.22° | ±10.6 cm |
+| 7.24 m (three) | ±0.84° | ±10.7 cm |
+| 10 m | ±0.61° | ±10.7 cm |
+
+Arc cannot buy any of that back. Beyond mid-range, **left/right aim — not arc — is the binding
+constraint.**
 
 ### 4. Room for error
 
@@ -131,8 +173,13 @@ little above `θ*`, which lands entry angles in the 40–48° band that coaching
 - **Side-view trajectory** — animated ball, apex marker, release geometry, backboard/rim, the
   shaded **cone of acceptance** (every launch angle that still swishes at the current speed), and
   the swish window drawn to scale at the rim.
+- **Through the rim, actual scale** — a true-relative-size cross-section of the ball passing
+  between the two rim edges, with ghost balls drawn at their exact grazing positions, shown side
+  by side against a straight-down drop.
 - **Ball's-eye view** — the rim as the ball sees it: full circle vs. foreshortened ellipse, with
-  the ball's cross-section overlaid and both clearances dimensioned.
+  the ball's cross-section drawn where this shot actually goes.
+- **Landing map** — the 2-D swish region (the eroded lens) with this shot's crossing point on it,
+  so the depth/lateral tradeoff is visible directly.
 - **Error-margin chart** — angular tolerance (°), velocity tolerance (%), and depth window (cm)
   across launch angles 20–80°, with the current angle and `θ*` marked.
 - **Top-down court** — click or drag anywhere to reposition the shooter; distance and lateral
@@ -145,7 +192,7 @@ little above `θ*`, which lands entry angles in the 40–48° band that coaching
 | Group | Controls |
 |---|---|
 | Player | height 150–220 cm, release height above head 10–40 cm, distance 1–10 m, lateral offset ±7 m |
-| Shot | launch angle 20–80°, animation speed 0.1–3× |
+| Shot | launch angle 20–80°, aim error left/right ±3°, animation speed 0.1–3× |
 | Equipment | rim height 2.0–3.5 m (10 ft = 3.05), rim diameter 14–24 in (18), ball diameter 6–12 in (9.4) |
 
 ---
