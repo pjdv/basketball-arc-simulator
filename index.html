@@ -151,8 +151,8 @@
   /* simplified three-gauge strip under the 3D scene */
   .quick{
     display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;
-    padding:14px 16px 16px;border-top:1px solid var(--line-soft);background:#0d131c;
-    border-radius:0 0 12px 12px;
+    padding:14px 16px 15px;background:#0d131c;
+    border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);
   }
   @media (max-width:700px){.quick{grid-template-columns:1fr;gap:12px}}
   .qctl .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:7px}
@@ -261,6 +261,7 @@
       <section class="panel">
         <h2>3D flight &amp; bounce <em>drag to orbit · shift/right-drag or arrows to pan · scroll to zoom · R resets</em></h2>
         <canvas id="scene"></canvas>
+        <div class="quick" id="quick"></div>
         <div class="views">
           <button data-cam="side">Side</button>
           <button data-cam="shooter">Shooter</button>
@@ -277,7 +278,6 @@
           <span class="speeds" id="t-speeds"></span>
         </div>
         <div id="events" class="events"></div>
-        <div class="quick" id="quick"></div>
       </section>
 
       <section class="panel">
@@ -1829,14 +1829,20 @@ function sweepAttribute(id, base, n){
           dp:(DECIDERS.find(d=>d.id===id)||{}).dp ?? 2};
 }
 
-let sens = {decider:"angle", res:null, force:null, busy:false};
+let sens = {decider:"angle", res:null, force:null, byId:null, busy:false};
 
 function runSensitivity(){
   const m = model;
-  if(!m || !m.ok){ sens.res = null; sens.force = null; renderBands(); drawVerdict(); return; }
+  if(!m || !m.ok){ sens.res = null; sens.force = null; sens.byId = null; renderBands(); drawVerdict(); return; }
   const base = m.s;
-  sens.force = sweepAttribute("trim", base, 72);
-  sens.res   = sens.decider === "trim" ? sens.force : sweepAttribute(sens.decider, base, 72);
+  // Always sweep the three primary gauges so each shows its own viable range,
+  // plus the deciding attribute when it is something else.
+  sens.byId = {};
+  for(const id of new Set(["trim","aim","angle", sens.decider])){
+    sens.byId[id] = sweepAttribute(id, base, 72);
+  }
+  sens.force = sens.byId.trim;
+  sens.res   = sens.byId[sens.decider];
   renderBands(); drawVerdict();
 }
 
@@ -1850,7 +1856,7 @@ function scheduleSensitivity(){
 // paint the viable segments onto the slider tracks
 function renderBands(){
   for(const it of ITEMS){
-    const r = (sens.res && sens.res.id===it.id) ? sens.res : (sens.force && sens.force.id===it.id ? sens.force : null);
+    const r = (sens.byId && sens.byId[it.id]) || null;
     const html = !r ? null : sens.busy ? '<i class="pending"></i>' : r.bands.map(b=>{
       const a = (b[0]-r.lo)/(r.hi-r.lo)*100, w = (b[1]-b[0])/(r.hi-r.lo)*100;
       return '<i style="left:'+a.toFixed(3)+'%;width:'+Math.max(0.4,w).toFixed(3)+'%"></i>';
@@ -2561,7 +2567,7 @@ window.addEventListener("resize", ()=>{ clearTimeout(rt); rt = setTimeout(drawSt
 
 document.getElementById("decide").addEventListener("change", e=>{
   sens.decider = e.target.value;
-  sens.res = null; renderBands();
+  sens.res = null; sens.byId = null; renderBands();
   scheduleSensitivity();
 });
 
