@@ -1987,7 +1987,8 @@ function pushGhostBall(items, ctx, pr, m, P, kind){
   }});
 }
 
-// Contacts already played. The ring-plane crossing is drawn separately, flat.
+// Every contact already played, plus the ring-plane entry once it has happened.
+// The entry ghost is pinned at the crossing so it does not chase the ball in.
 function ghostMoments(m){
   const sim = m.sim; if(!sim) return [];
   const out = [];
@@ -1995,6 +1996,13 @@ function ghostMoments(m){
     if(e.type !== "rim" && e.type !== "board") continue;
     if(e.t > pb.t + 1e-6) continue;
     out.push({x:e.x, y:e.y, z:e.z, kind:e.type, t:e.t});
+  }
+  const X = sim.firstCross;
+  if(X && pb.t >= X.t - 1e-6){
+    const off = Math.hypot(X.x, X.y);
+    if(off < m.p.R + m.p.r){                     // skip a wild miss far from the ring
+      out.push({x:X.x, y:X.y, z:m.p.H, kind: (m.p.R - off - m.p.r) > 0 ? "clean" : "tight", t:X.t});
+    }
   }
   return out;
 }
@@ -2264,18 +2272,17 @@ function drawScene(){
     }});
   })();
 
-  // ---- ball's cross-section at the ring, shown while paused ----
-  if(!pb.playing){
-    const A = rimCrossAnchor(m);
-    for(const g of ghostMoments(m)) pushGhostBall(items, ctx, pr, m, g, g.kind);
-    if(A) pushEntryDisc(items, ctx, pr, m, A, 2);
-    if(A){
-      const lbl = pr({x:A.x, y:A.y, z:p.H});
-      if(lbl) items.push({d:lbl.z-0.002, fn:()=>{
-        label(ctx, (A.fit>0 ? fx(A.fit*100,1)+" cm clear" : "clips by "+fx(-A.fit*100,1)+" cm"),
-              lbl.x, lbl.y+16, {color: A.fit>0?"#3ddc97":"#ff5d5d", size:10.5, align:"center", weight:"600"});
-      }});
-    }
+  // ---- ghost balls at every contact and at the entry point, plus the flat
+  //      entry footprint. Shown during playback too, not only when paused. ----
+  const A = rimCrossAnchor(m);
+  for(const g of ghostMoments(m)) pushGhostBall(items, ctx, pr, m, g, g.kind);
+  if(A) pushEntryDisc(items, ctx, pr, m, A, 2);
+  if(!pb.playing && A){                          // clearance callout only when parked
+    const lbl = pr({x:A.x, y:A.y, z:p.H});
+    if(lbl) items.push({d:lbl.z-0.002, fn:()=>{
+      label(ctx, (A.fit>0 ? fx(A.fit*100,1)+" cm clear" : "clips by "+fx(-A.fit*100,1)+" cm"),
+            lbl.x, lbl.y+16, {color: A.fit>0?"#3ddc97":"#ff5d5d", size:10.5, align:"center", weight:"600"});
+    }});
   }
 
   // ---- contact markers ----
