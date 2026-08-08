@@ -537,6 +537,7 @@ function companionAngle(v, th0, L, dy){
 const DECIDERS = [
   {id:"angle", label:"Launch angle",         unit:"°",   dp:1},
   {id:"trim",  label:"Release speed (force)", unit:"%",  dp:1},
+  {id:"elev",  label:"Launch angle error",    unit:"°",  dp:2},
   {id:"aim",   label:"Aim error left/right",  unit:"°",  dp:2},
   {id:"dist",  label:"Distance to basket",    unit:" m", dp:2},
   {id:"rel",   label:"Release height",        unit:" cm",dp:0}
@@ -568,6 +569,10 @@ const CONTROLS = [
   {group:"Bounce (3D sim)", items:[
     {id:"trim",   label:"Release speed trim",  min:-12, max:12,  step:0.1,  val:0,
        fmt:v=>Math.abs(v)<0.05?"exact":(v>0?"+":"")+fx(v,1)+"% "+(v>0?"long":"short")},
+    // Perturbs the launch angle while HOLDING the solved speed, so the ball
+    // lands off the rim centre — the direct way to catch front or back iron.
+    {id:"elev",   label:"Launch angle error",  min:-4,  max:4,   step:0.05, val:0,
+       fmt:v=>Math.abs(v)<0.005?"on line":fx(Math.abs(v),2)+"° "+(v>0?"high":"low")},
     {id:"eRim",   label:"Rim bounciness",      min:0.2, max:0.85,step:0.01, val:0.55, fmt:v=>"e = "+fx(v,2)},
     {id:"eBoard", label:"Backboard bounciness",min:0.3, max:0.95,step:0.01, val:0.72, fmt:v=>"e = "+fx(v,2)},
     {id:"eFloor", label:"Floor bounciness",    min:0.4, max:0.92,step:0.01, val:0.76, fmt:v=>"e = "+fx(v,2)},
@@ -1517,10 +1522,13 @@ function simulate(m, opts){
   const ca = Math.cos(m.alpha), sa = Math.sin(m.alpha);
   const ax = ux*ca - uy*sa, ay = ux*sa + uy*ca;              // sprayed by the aim error
   const v0 = m.v * (1 + s.trim/100);
-  const vh = v0*Math.cos(p.th);
+  // The speed stays the one solved for the nominal angle; the elevation error
+  // tilts the launch off that solution, so the ball lands short or long.
+  const thShot = clamp(p.th + (s.elev||0)*D2R, 1*D2R, 88*D2R);
+  const vh = v0*Math.cos(thShot);
 
   let P = {x:rel.x, y:rel.y, z:rel.z};
-  let V = {x:vh*ax, y:vh*ay, z:v0*Math.sin(p.th)};
+  let V = {x:vh*ax, y:vh*ay, z:v0*Math.sin(thShot)};
 
   const samples = quick ? null : [{t:0, x:P.x, y:P.y, z:P.z, vx:V.x, vy:V.y, vz:V.z}];
   const events = [];
@@ -1819,19 +1827,46 @@ function rimCrossAnchor(m){
   return {x:a.x, y:a.y, off, fit: m.p.R - off - m.p.r, crossed:!!crossed};
 }
 
-// The ball at its widest, drawn in the ring plane for a true-scale comparison.
-function pushCrossSection(items, ctx, pr, m, A, lw){
-  const p = m.p, NC = 56, col = A.fit > 0 ? "rgba(255,180,120,.95)" : "#ff5d5d";
-  for(let i=0;i<NC;i++){
-    const a0 = 2*Math.PI*i/NC, a1 = 2*Math.PI*(i+1)/NC;
-    const q0 = pr({x:A.x + p.r*Math.cos(a0), y:A.y + p.r*Math.sin(a0), z:p.H});
-    const q1 = pr({x:A.x + p.r*Math.cos(a1), y:A.y + p.r*Math.sin(a1), z:p.H});
-    if(!q0 || !q1) continue;
-    items.push({d:(q0.z+q1.z)/2 - 0.0005, fn:()=>{
-      ctx.strokeStyle = col; ctx.lineWidth = lw;
-      dash(ctx,[4,3],()=>{ ctx.beginPath(); ctx.moveTo(q0.x,q0.y); ctx.lineTo(q1.x,q1.y); ctx.stroke(); });
-    }});
+// A faint, true-size ghost of the ball frozen at a decisive moment: each rim or
+// backboard contact, plus the instant its centre crosses the ring plane.
+const GHOST_TONE = {
+  rim:   ["rgba(255,150,110,.95)", "rgba(190,60,25,.95)",  "#e0503a"],
+  board: ["rgba(160,220,255,.95)", "rgba(40,120,175,.95)", "#4cc9f0"],
+  clean: ["rgba(255,191,133,.95)", "rgba(168,70,26,.95)",  "#3ddc97"],
+  tight: ["rgba(255,150,150,.95)", "rgba(150,40,40,.95)",  "#ff5d5d"]
+};
+function pushGhostBall(items, ctx, pr, m, P, kind){
+  const a = pr(P); if(!a) return;
+  const rr = Math.max(2, m.p.r*a.s);
+  const tone = GHOST_TONE[kind] || GHOST_TONE.clean;
+  items.push({d:a.z - 0.0006, fn:()=>{
+    ctx.save();
+    ctx.globalAlpha = 0.38;
+    const gr = ctx.createRadialGradient(a.x-rr*0.35, a.y-rr*0.4, rr*0.12, a.x, a.y, rr);
+    gr.addColorStop(0, tone[0]); gr.addColorStop(1, tone[1]);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(a.x, a.y, rr, 0, 7); ctx.fill();
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.lineWidth = Math.max(0.5, rr*0.05);
+    ctx.beginPath(); ctx.ellipse(a.x, a.y, rr, rr*0.38, 0.5, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(a.x, a.y, rr*0.38, rr, 0.5, 0, 7); ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = tone[2]; ctx.lineWidth = 1.4;
+    dash(ctx,[4,3],()=>{ ctx.beginPath(); ctx.arc(a.x, a.y, rr, 0, 7); ctx.stroke(); });
+  }});
+}
+
+// Contacts already played, plus the ring-plane crossing.
+function ghostMoments(m){
+  const sim = m.sim; if(!sim) return [];
+  const out = [];
+  for(const e of sim.events){
+    if(e.type !== "rim" && e.type !== "board") continue;
+    if(e.t > pb.t + 1e-6) continue;
+    out.push({x:e.x, y:e.y, z:e.z, kind:e.type, t:e.t});
   }
+  const A = rimCrossAnchor(m);
+  if(A) out.push({x:A.x, y:A.y, z:m.p.H, kind: A.fit > 0 ? "clean" : "tight", t:A.crossed ? sim.firstCross.t : pb.t});
+  return out;
 }
 
 function roundRect(ctx, x, y, w, h, r){
@@ -1901,7 +1936,7 @@ function drawRimInset(ctx, W, H){
   // the crossing point rather than sliding away as the ball falls through.
   const A = rimCrossAnchor(m);
   const fit = A ? A.fit : null;
-  if(A) pushCrossSection(items, ctx, pr, m, A, 1.6);
+  for(const g of ghostMoments(m)) pushGhostBall(items, ctx, pr, m, g, g.kind);
 
   // where the ball's centre actually crosses the ring plane
   const X = sim && sim.firstCross;
@@ -1947,7 +1982,7 @@ function drawRimInset(ctx, W, H){
   for(const it of items) it.fn();
 
   label(ctx, "RIM CLOSE-UP", ix+9, iy+14, {color:"#8b9bb0", size:9.5, weight:"700"});
-  label(ctx, "dashed = ball at its widest ("+fx(p.dball/IN,1)+"″ vs "+fx(p.Drim/IN,1)+"″ ring)",
+  label(ctx, "ghost = ball at contact · "+fx(p.dball/IN,1)+"″ ball vs "+fx(p.Drim/IN,1)+"″ ring",
         ix+9, iy+27, {color:"#5d6c80", size:9});
   if(fit !== null){
     label(ctx, fit > 0 ? fx(fit*100,1)+" cm of ring left on the near side"
@@ -2070,8 +2105,8 @@ function drawScene(){
   // ---- ball's cross-section at the ring, shown while paused ----
   if(!pb.playing){
     const A = rimCrossAnchor(m);
+    for(const g of ghostMoments(m)) pushGhostBall(items, ctx, pr, m, g, g.kind);
     if(A){
-      pushCrossSection(items, ctx, pr, m, A, 2);
       const lbl = pr({x:A.x, y:A.y, z:p.H});
       if(lbl) items.push({d:lbl.z-0.002, fn:()=>{
         label(ctx, (A.fit>0 ? fx(A.fit*100,1)+" cm clear" : "clips by "+fx(-A.fit*100,1)+" cm"),

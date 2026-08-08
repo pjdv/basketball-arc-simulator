@@ -204,6 +204,26 @@ Sweeping release speed at 5 m produces exactly the behaviour you'd expect on a c
 Note the **disjoint make bands**: 0%, +1% and +5% all score while +3% misses. Room for error is
 not one interval.
 
+**Aiming off the rim centre.** Two controls perturb the shot away from the solved solution, which
+is what actually puts a ball on iron. *Aim error* rotates the launch azimuth (wide by `L·sin α`);
+*launch angle error* tilts the elevation **while holding the solved speed**, so the ball lands
+short or long. Sweeping the latter at 5 m from a 52° launch:
+
+| Angle error | Result |
+|---|---|
+| −4° … −0.5° | SWISH |
+| 0° | SWISH |
+| +1.5° | SWISH |
+| +2° | BANK — off the glass |
+| +3°, +4° | MISS — iron, then glass |
+
+That lopsidedness is not a quirk — it independently reproduces the analysis tab, which computes
+**+2.33° / −4.85°** of angular tolerance here. A 52° launch sits just above the minimum-force angle
+θ* = 50.1°, where range is stationary in angle (`∂x/∂θ = 0`), so pulling the angle *down* toward θ*
+barely moves the ball while pushing it up costs range immediately. Two independent models — a
+closed-form window and a 600 Hz contact simulation — agreeing on that asymmetry is the strongest
+check in the project.
+
 **Verification.** The physics is checked headlessly: no contact ever adds energy, the ball never
 interpenetrates the rim tube or sinks through the floor, quick-mode and full-mode verdicts agree on
 27/27 cases, results are deterministic, and the sim's clean-entry verdict is cross-checked against
@@ -262,7 +282,7 @@ lucky rim-rolls: real in simulation, but not repeatable.
 |---|---|
 | Player | height 150–220 cm, release height above head 10–40 cm, distance 1–10 m, lateral offset ±7 m |
 | Shot | launch angle 20–80°, aim error left/right ±3°, animation speed 0.1–3× |
-| Bounce | release speed trim ±12%, rim / backboard / floor restitution, contact friction |
+| Bounce | release speed trim ±12%, launch angle error ±4°, rim / backboard / floor restitution, contact friction |
 | Equipment | rim height 2.0–3.5 m (10 ft = 3.05), rim diameter 14–24 in (18), ball diameter 6–12 in (9.4) |
 
 **Distance presets** jump to the spots that matter — layup, free throw (4.19 m), mid-range,
