@@ -235,15 +235,30 @@ timestamps and are clickable to jump.
 **Camera.** Five presets (side, shooter, top, corner, rim close-up) plus free movement — drag to
 orbit, shift/right-drag or arrow keys to pan, scroll or `+`/`−` to zoom, `R` to reset.
 
+**Expressing effort.** A toggle switches the release-speed control and every effort readout between
+**% trim**, **m/s** and **newtons**. Speed is what the model actually solves for; the force figure
+needs two extra assumptions and says so on screen — ball mass (size-7 0.624 kg, scaled by
+diameter³ at constant density) and a 35 cm push:
+
+```
+F_avg = m·v² / (2·d_stroke) + m·g        e.g. 0.624·7.67²/0.70 + 0.624·9.8 = 59 N
+```
+
+Treat newtons as indicative: a real stroke recruits legs and is neither constant-force nor 35 cm.
+
 **Rim close-up inset**, pinned top-right of the scene: a fixed camera looking down into the ring
 from the shooter's side, with the backboard in frame so the orientation is unambiguous. It draws
-the ball's **widest cross-section — its great circle — in the ring plane**, so ball width and ring
-opening are compared at true scale, and reports both the entry offset from centre and the remaining
-gap to the near inner edge.
+both the entry offset from centre and the remaining gap to the near inner edge.
 
-That cross-section **tracks the ball on the way in, then freezes at the crossing point** rather
-than sliding away as the ball falls through — the decisive moment stays on screen. Pausing the main
-view draws the same frozen circle on the ring there too, annotated with the clearance.
+Two markers make the moment legible, in the inset and in the paused main view:
+
+- **Ghost balls** — faint, true-size 3D balls frozen at every rim and backboard contact that has
+  played, tinted per surface.
+- **Entry disc** — the ball's widest cross-section laid *flat in the ring plane at rim height*, so
+  it reads as a horizontal disc whatever the camera angle. It tracks the ball on the way in, then
+  **freezes at the crossing point** instead of sliding away as the ball falls through. It appears
+  once the ball is over the ring, touches iron, or crosses — and is suppressed on a wild miss where
+  the footprint no longer meets the ring.
 
 ## Room for error, measured by simulation
 
