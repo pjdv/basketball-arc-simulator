@@ -22,6 +22,8 @@
     --shadow:0 1px 0 rgba(255,255,255,.03), 0 8px 24px rgba(0,0,0,.4);
   }
   *{box-sizing:border-box}
+  /* .stack sets display:flex, which would otherwise beat the UA [hidden] rule */
+  [hidden]{display:none !important}
   html,body{margin:0;padding:0}
   body{
     background:
@@ -41,9 +43,26 @@
   header h1{font-size:19px;margin:0;letter-spacing:-.2px;font-weight:650}
   header h1 span{color:var(--accent)}
   header p{margin:0;color:var(--txt-dim);font-size:13px;max-width:70ch}
-  .wrap{padding:18px 24px 60px;max-width:1680px;margin:0 auto}
-  .layout{display:grid;grid-template-columns:296px minmax(0,1fr);gap:18px;align-items:start}
-  @media (max-width:1040px){.layout{grid-template-columns:1fr}}
+  header{justify-content:space-between}
+  .hgroup{display:flex;flex-wrap:wrap;align-items:baseline;gap:14px;min-width:0}
+  .tabs{display:flex;gap:6px;background:#0d131c;border:1px solid var(--line);border-radius:10px;padding:4px}
+  .tab{
+    flex:0 0 auto;background:transparent;border:0;color:var(--txt-dim);border-radius:7px;
+    padding:7px 13px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
+  }
+  .tab:hover{color:var(--txt)}
+  .tab.is-on{background:var(--accent);color:#1a0f05}
+  .tab:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+
+  .wrap{padding:18px 24px 60px;max-width:1780px;margin:0 auto}
+  .layout{display:grid;grid-template-columns:284px minmax(0,1fr) 340px;gap:18px;align-items:start}
+  @media (max-width:1500px){.layout{grid-template-columns:270px minmax(0,1fr) 300px}}
+  @media (max-width:1240px){.layout{grid-template-columns:270px minmax(0,1fr)} .rail{grid-column:1/-1;flex-direction:row}}
+  @media (max-width:1040px){.layout{grid-template-columns:1fr} .rail{flex-direction:column}}
+
+  .rail{position:sticky;top:14px;display:flex;flex-direction:column;gap:18px}
+  .rail > .panel{flex:1 1 0;min-width:0}
+  @media (max-width:1240px){.rail{position:static}}
 
   .panel{
     background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);
@@ -70,8 +89,27 @@
   input[type=range]{
     -webkit-appearance:none;appearance:none;width:100%;height:18px;background:transparent;cursor:pointer;margin:0;
   }
-  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:3px;background:var(--line)}
-  input[type=range]::-moz-range-track{height:4px;border-radius:3px;background:var(--line)}
+  /* the visible track is the .bands element underneath, so the viable
+     segments can render behind the thumb instead of being covered by it */
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:3px;background:transparent}
+  input[type=range]::-moz-range-track{height:4px;border-radius:3px;background:transparent}
+  .track-wrap{position:relative}
+  .bands{
+    position:absolute;left:0;right:0;top:7px;height:4px;border-radius:3px;
+    background:var(--line);overflow:hidden;pointer-events:none;
+  }
+  .bands.live{box-shadow:0 0 0 1px rgba(61,220,151,.25)}
+  .bands i{position:absolute;top:0;bottom:0;background:var(--good);opacity:.85;border-radius:2px}
+  .bands i.pending{left:0;width:100%;background:repeating-linear-gradient(90deg,#243043 0 6px,#2f3f56 6px 12px);opacity:.7}
+
+  select{
+    width:100%;background:#161f2b;color:var(--txt);border:1px solid var(--line);border-radius:8px;
+    padding:7px 9px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;
+  }
+  select:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+  .sens{margin-top:9px;font-size:11.5px;color:var(--txt-dim);line-height:1.45}
+  .sens b{color:var(--good);font-weight:650}
+  .sens .none{color:var(--bad);font-weight:600}
   input[type=range]::-webkit-slider-thumb{
     -webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);
     margin-top:-5px;border:2px solid #0a0e14;box-shadow:0 0 0 1px var(--accent);
@@ -80,6 +118,40 @@
     width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid #0a0e14;box-shadow:0 0 0 1px var(--accent);
   }
   input[type=range]:focus-visible{outline:2px solid var(--accent-2);outline-offset:4px;border-radius:4px}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin:-4px 0 12px}
+  .chips button{
+    flex:0 0 auto;background:#161f2b;border:1px solid var(--line);color:var(--txt-dim);
+    border-radius:999px;padding:3.5px 9px;font:inherit;font-size:10.5px;font-weight:600;cursor:pointer;
+  }
+  .chips button:hover{background:#22304a;color:var(--txt)}
+  .chips button.is-on{background:rgba(255,138,61,.16);border-color:var(--accent);color:var(--accent)}
+
+  .views{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 0}
+  .views button{flex:0 0 auto;padding:5px 11px;font-size:11px;background:#161f2b}
+  .views button.is-on{background:rgba(76,201,240,.15);border-color:var(--accent-2);color:var(--accent-2)}
+
+  .transport{display:flex;align-items:center;gap:9px;padding:11px 14px;flex-wrap:wrap}
+  .transport button{flex:0 0 auto;padding:6px 12px;font-size:11.5px}
+  .transport #t-scrub{flex:1 1 180px;min-width:120px}
+  .tcode{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--txt);
+         font-variant-numeric:tabular-nums;min-width:64px;text-align:right}
+  .speeds{display:flex;gap:4px;flex:0 0 auto}
+  .speeds button{padding:4px 8px;font-size:10.5px;border-radius:6px}
+  .speeds button.is-on{background:var(--accent-2);border-color:var(--accent-2);color:#05131a}
+
+  .events{padding:0 14px 13px;display:flex;flex-direction:column;gap:4px;max-height:190px;overflow:auto}
+  .ev{
+    display:flex;align-items:center;gap:9px;background:#0d131c;border:1px solid var(--line-soft);
+    border-left:2px solid var(--line);border-radius:6px;padding:6px 10px;font-size:11.5px;cursor:pointer;
+  }
+  .ev:hover{background:#141d29}
+  .ev .t{font-family:ui-monospace,Menlo,monospace;color:var(--txt-faint);font-variant-numeric:tabular-nums;flex:0 0 auto}
+  .ev .w{color:var(--txt-dim);flex:1 1 auto;min-width:0}
+  .ev.rim{border-left-color:#e0503a} .ev.board{border-left-color:#4cc9f0}
+  .ev.through{border-left-color:#3ddc97} .ev.floor{border-left-color:#5d6c80}
+  #scene{aspect-ratio:16/9.6;cursor:grab;touch-action:none}
+  #scene.drag{cursor:grabbing}
+
   .btns{display:flex;gap:8px;padding:12px 14px}
   button{
     flex:1;background:#1b2534;color:var(--txt);border:1px solid var(--line);border-radius:8px;
@@ -134,8 +206,14 @@
 <body>
 
 <header>
-  <h1>Basketball <span>Arc</span> Simulator</h1>
-  <p>How launch angle changes the size of the target the ball actually sees — and what it costs in force precision.</p>
+  <div class="hgroup">
+    <h1>Basketball <span>Arc</span> Simulator</h1>
+    <p>How launch angle changes the size of the target the ball actually sees — and what it costs in force precision.</p>
+  </div>
+  <nav class="tabs">
+    <button class="tab is-on" data-view="analysis">Geometry &amp; error analysis</button>
+    <button class="tab" data-view="sim3d">3D flight &amp; bounce</button>
+  </nav>
 </header>
 
 <div class="wrap">
@@ -153,7 +231,37 @@
       </div>
     </aside>
 
-    <div class="stack">
+    <div class="stack" id="view-sim3d" hidden>
+
+      <section class="panel">
+        <h2>3D flight &amp; bounce <em>drag to orbit · shift/right-drag or arrows to pan · scroll to zoom · R resets</em></h2>
+        <canvas id="scene"></canvas>
+        <div class="views">
+          <button data-cam="side">Side</button>
+          <button data-cam="shooter">Shooter</button>
+          <button data-cam="top">Top</button>
+          <button data-cam="corner" class="is-on">Corner</button>
+          <button data-cam="rimcam">Rim close-up</button>
+        </div>
+        <div class="transport">
+          <button id="t-play" class="primary">Pause</button>
+          <button id="t-back" title="Step back">◀‖</button>
+          <button id="t-fwd" title="Step forward">‖▶</button>
+          <input type="range" id="t-scrub" min="0" max="1000" value="0" step="1">
+          <span class="tcode" id="t-time">0.000 s</span>
+          <span class="speeds" id="t-speeds"></span>
+        </div>
+        <div id="events" class="events"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Shot verdict <em>simulated, not inferred</em></h2>
+        <div class="metrics" id="verdict"></div>
+      </section>
+
+    </div>
+
+    <div class="stack" id="view-analysis">
 
       <section class="panel">
         <h2>Side view — trajectory &amp; cone of acceptance <em>shaded band = every launch angle that still swishes at this speed</em></h2>
@@ -180,14 +288,6 @@
 
       <div class="trio">
         <section class="panel">
-          <h2>Ball's-eye view <em>rim seen along the flight path</em></h2>
-          <canvas id="rim"></canvas>
-        </section>
-        <section class="panel">
-          <h2>Landing map <em>where the ball crosses the rim plane</em></h2>
-          <canvas id="landing"></canvas>
-        </section>
-        <section class="panel">
           <h2>Room for error vs. launch angle</h2>
           <canvas id="chart"></canvas>
         </section>
@@ -209,6 +309,19 @@
       </section>
 
     </div>
+
+    <!-- shared rail: driven by the same model, so it stays live in both views -->
+    <aside class="rail">
+      <section class="panel">
+        <h2>Ball's-eye view <em>along the flight path</em></h2>
+        <canvas id="rim"></canvas>
+      </section>
+      <section class="panel">
+        <h2>Landing map <em>at the rim plane</em></h2>
+        <canvas id="landing"></canvas>
+      </section>
+    </aside>
+
   </div>
 </div>
 
@@ -419,11 +532,31 @@ function companionAngle(v, th0, L, dy){
 /* ------------------------------------------------------------------ *
  * Controls
  * ------------------------------------------------------------------ */
+// Declared here because buildControls() runs immediately and populates the
+// deciding-attribute selector from it.
+const DECIDERS = [
+  {id:"angle", label:"Launch angle",         unit:"°",   dp:1},
+  {id:"trim",  label:"Release speed (force)", unit:"%",  dp:1},
+  {id:"aim",   label:"Aim error left/right",  unit:"°",  dp:2},
+  {id:"dist",  label:"Distance to basket",    unit:" m", dp:2},
+  {id:"rel",   label:"Release height",        unit:" cm",dp:0}
+];
+
 const CONTROLS = [
   {group:"Shooter", items:[
     {id:"playerH", label:"Player height",      min:150, max:220, step:1,    val:190,  fmt:v=>fx(v,0)+" cm · "+ftin(v/100)},
     {id:"rel",     label:"Release above head", min:10,  max:40,  step:1,    val:25,   fmt:v=>fx(v,0)+" cm"},
-    {id:"dist",    label:"Distance to basket", min:1,   max:10,  step:0.05, val:5,    fmt:v=>fx(v,2)+" m · "+fx(v/0.3048,1)+" ft"},
+    {id:"dist",    label:"Distance to basket", min:1,   max:10,  step:0.05, val:5,    fmt:v=>fx(v,2)+" m · "+fx(v/0.3048,1)+" ft",
+       // distances are to the RIM CENTRE: the FT line is 15 ft from the board face,
+       // and the board face sits 0.375 m behind the ring, so 4.572 − 0.375 = 4.19 m.
+       presets:[
+         {label:"Layup",       set:{dist:1.60, off:0}},
+         {label:"Free throw",  set:{dist:4.19, off:0}},
+         {label:"Mid-range",   set:{dist:5.00, off:0}},
+         {label:"3-pt top",    set:{dist:7.24, off:0}},
+         {label:"Corner 3",    set:{dist:6.71, off:6.55}},
+         {label:"FIBA 3",      set:{dist:6.75, off:0}}
+       ]},
     {id:"off",     label:"Lateral offset",     min:-7,  max:7,   step:0.05, val:0,    fmt:v=>(Math.abs(v)<0.005?"centre":fx(Math.abs(v),2)+" m "+(v<0?"left":"right"))}
   ]},
   {group:"Shot", items:[
@@ -431,6 +564,14 @@ const CONTROLS = [
     {id:"aim",     label:"Aim error left/right", min:-3, max:3,  step:0.02, val:0,
        fmt:v=>Math.abs(v)<0.005 ? "on line" : fx(Math.abs(v),2)+"° "+(v<0?"left":"right")},
     {id:"speed",   label:"Animation speed",    min:0.1, max:3,   step:0.1,  val:1,    fmt:v=>fx(v,1)+"×"}
+  ]},
+  {group:"Bounce (3D sim)", items:[
+    {id:"trim",   label:"Release speed trim",  min:-12, max:12,  step:0.1,  val:0,
+       fmt:v=>Math.abs(v)<0.05?"exact":(v>0?"+":"")+fx(v,1)+"% "+(v>0?"long":"short")},
+    {id:"eRim",   label:"Rim bounciness",      min:0.2, max:0.85,step:0.01, val:0.55, fmt:v=>"e = "+fx(v,2)},
+    {id:"eBoard", label:"Backboard bounciness",min:0.3, max:0.95,step:0.01, val:0.72, fmt:v=>"e = "+fx(v,2)},
+    {id:"eFloor", label:"Floor bounciness",    min:0.4, max:0.92,step:0.01, val:0.76, fmt:v=>"e = "+fx(v,2)},
+    {id:"mu",     label:"Contact friction",    min:0,   max:0.6, step:0.01, val:0.22, fmt:v=>"μ = "+fx(v,2)}
   ]},
   {group:"Court & equipment", items:[
     {id:"rimH",    label:"Rim height",         min:2,   max:3.5, step:0.01, val:3.05, fmt:v=>fx(v,2)+" m · "+ftin(v)},
@@ -444,6 +585,16 @@ const inputs = {}, outputs = {};
 
 (function buildControls(){
   const host = document.getElementById("controls");
+
+  const sg = document.createElement("div");
+  sg.className = "grp";
+  sg.innerHTML =
+    '<h3>Room for error</h3>'+
+    '<div class="ctl"><div class="row"><label for="decide">Deciding attribute</label></div>'+
+    '<select id="decide">'+DECIDERS.map(d=>'<option value="'+d.id+'">'+d.label+'</option>').join("")+'</select>'+
+    '<div class="sens" id="sens-out">—</div></div>';
+  host.appendChild(sg);
+
   for(const g of CONTROLS){
     const d = document.createElement("div");
     d.className = "grp";
@@ -453,7 +604,9 @@ const inputs = {}, outputs = {};
       c.className = "ctl";
       c.innerHTML =
         '<div class="row"><label for="'+it.id+'">'+it.label+'</label><output id="out-'+it.id+'"></output></div>'+
-        '<input type="range" id="'+it.id+'" min="'+it.min+'" max="'+it.max+'" step="'+it.step+'" value="'+it.val+'">';
+        '<div class="track-wrap"><div class="bands" id="bands-'+it.id+'"></div>'+
+        '<input type="range" id="'+it.id+'" min="'+it.min+'" max="'+it.max+'" step="'+it.step+'" value="'+it.val+'"></div>'+
+        (it.presets ? '<div class="chips" id="chips-'+it.id+'"></div>' : '');
       d.appendChild(c);
     }
     host.appendChild(d);
@@ -462,8 +615,35 @@ const inputs = {}, outputs = {};
     inputs[it.id]  = document.getElementById(it.id);
     outputs[it.id] = document.getElementById("out-"+it.id);
     inputs[it.id].addEventListener("input", ()=>{ if(it.id!=="speed") restart(); recompute(); });
+    if(it.presets){
+      const box = document.getElementById("chips-"+it.id);
+      it.presets.forEach((pr,i)=>{
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = pr.label;
+        b.dataset.idx = i;
+        b.addEventListener("click", ()=>{
+          for(const k in pr.set) setVal(k, pr.set[k]);
+          restart(); recompute();
+        });
+        box.appendChild(b);
+      });
+    }
   }
 })();
+
+// highlight whichever preset matches the current position
+function syncChips(s){
+  for(const it of ITEMS){
+    if(!it.presets) continue;
+    const box = document.getElementById("chips-"+it.id);
+    if(!box) continue;
+    [...box.children].forEach((b,i)=>{
+      const set = it.presets[i].set;
+      const hit = Object.keys(set).every(k => Math.abs(s[k] - set[k]) < 0.03);
+      b.classList.toggle("is-on", hit);
+    });
+  }
+}
 
 function setVal(id, v){ inputs[id].value = v; }
 function readInputs(){
@@ -472,6 +652,7 @@ function readInputs(){
   // A lateral offset can never exceed the straight-line distance to the hoop.
   if(Math.abs(s.off) > s.dist){ s.off = Math.sign(s.off)*s.dist; setVal("off", s.off.toFixed(2)); }
   for(const it of ITEMS) outputs[it.id].textContent = it.fmt(s[it.id]);
+  syncChips(s);
   return s;
 }
 
@@ -540,6 +721,7 @@ function recompute(){
       m.pathT = cr.t*1.28;                             // carry the ball a little past the rim
     }
   }
+  if(m.ok){ try{ m.sim = simulate(m); }catch(err){ console.error("simulate failed:", err); m.sim = null; } }
   model = m;
   m.curve = buildCurve(m);
 
@@ -547,6 +729,7 @@ function recompute(){
   al.hidden = m.ok; al.textContent = m.reason;
 
   drawStatic();
+  scheduleSensitivity();
   return m;
 }
 
@@ -1300,6 +1483,834 @@ function drawExplain(){
     "treated as locally straight over the ~"+fx(p.dball*100,0)+" cm of its passage through the hoop. g = 9.8 m/s², no wind.";
 }
 
+/* ================================================================== *
+ * 3D FLIGHT & BOUNCE
+ *
+ * World frame: origin on the floor under the rim centre.
+ *   +x → out into the court (toward the shooter)   +y → lateral   +z → up
+ *
+ * The rim is a torus: ring centreline at radius R + tube, tube radius
+ * `tube`. Contact when |p − nearest centreline point| < r_ball + tube,
+ * which is the exact condition for a real ring and agrees with the
+ * analytical panels' idealised zero-thickness inner edge.
+ * ================================================================== */
+const BB = { off:0.375, w:1.829, h:1.067, drop:0.15, sqW:0.59, sqH:0.45 };
+const TUBE = 0.0079;                       // ⅝″ rim stock, radius
+const SIM_DT = 1/600, SIM_MAX_T = 5.0;
+
+function shooterWorld(p, s){
+  const off = s.off, out = Math.sqrt(Math.max(0, p.L*p.L - off*off));
+  return {x: out, y: off, z: p.h0};
+}
+
+// opts.quick → no sample storage and early exit once the result is decided.
+// Used by the sensitivity sweep, which runs ~100 simulations per redraw.
+function simulate(m, opts){
+  const quick = !!(opts && opts.quick);
+  const p = m.p, s = m.s;
+  const g = G, rb = p.r, Rc = p.R + TUBE, H = p.H;
+  const eRim = s.eRim, eBoard = s.eBoard, eFloor = s.eFloor, mu = s.mu;
+  const bbZ0 = H - BB.drop, bbZ1 = H - BB.drop + BB.h, bbX = -BB.off;
+
+  const rel = shooterWorld(p, s);
+  const ux = -rel.x/p.L, uy = -rel.y/p.L;                    // horizontal unit toward the hoop
+  const ca = Math.cos(m.alpha), sa = Math.sin(m.alpha);
+  const ax = ux*ca - uy*sa, ay = ux*sa + uy*ca;              // sprayed by the aim error
+  const v0 = m.v * (1 + s.trim/100);
+  const vh = v0*Math.cos(p.th);
+
+  let P = {x:rel.x, y:rel.y, z:rel.z};
+  let V = {x:vh*ax, y:vh*ay, z:v0*Math.sin(p.th)};
+
+  const samples = quick ? null : [{t:0, x:P.x, y:P.y, z:P.z, vx:V.x, vy:V.y, vz:V.z}];
+  const events = [];
+  const touching = {rim:false, board:false, floor:false};
+  let t = 0, through = null, restT = 0;
+  let madeFlag = false, madeT = null, nSteps = 0, firstCross = null;
+
+  const addEvent = (type, tt, at, speed)=> events.push({type, t:tt, x:at.x, y:at.y, z:at.z, speed});
+
+  while(t < SIM_MAX_T){
+    const prev = {x:P.x, y:P.y, z:P.z};
+    V.z -= g*SIM_DT;
+    P.x += V.x*SIM_DT; P.y += V.y*SIM_DT; P.z += V.z*SIM_DT;
+    t += SIM_DT;
+
+    // ---- rim (torus) ----
+    const ql = Math.hypot(P.x, P.y);
+    let nx, ny;
+    if(ql > 1e-9){ nx = P.x/ql; ny = P.y/ql; } else { nx = 1; ny = 0; }
+    const N = {x:Rc*nx, y:Rc*ny, z:H};
+    const dv = {x:P.x-N.x, y:P.y-N.y, z:P.z-N.z};
+    const dl = Math.hypot(dv.x, dv.y, dv.z);
+    if(dl < rb + TUBE && dl > 1e-9){
+      const n = {x:dv.x/dl, y:dv.y/dl, z:dv.z/dl};
+      P.x = N.x + n.x*(rb+TUBE); P.y = N.y + n.y*(rb+TUBE); P.z = N.z + n.z*(rb+TUBE);
+      const vn = V.x*n.x + V.y*n.y + V.z*n.z;
+      if(vn < 0){
+        const tx = V.x - vn*n.x, ty = V.y - vn*n.y, tz = V.z - vn*n.z;
+        V.x = tx*(1-mu) - eRim*vn*n.x;
+        V.y = ty*(1-mu) - eRim*vn*n.y;
+        V.z = tz*(1-mu) - eRim*vn*n.z;
+        if(!touching.rim) addEvent("rim", t, P, Math.abs(vn));
+      }
+      touching.rim = true;
+    } else touching.rim = false;
+
+    // ---- backboard (rounded rectangle: handles face and edges) ----
+    const cy = clamp(P.y, -BB.w/2, BB.w/2), cz = clamp(P.z, bbZ0, bbZ1);
+    const bv = {x:P.x-bbX, y:P.y-cy, z:P.z-cz};
+    const bl = Math.hypot(bv.x, bv.y, bv.z);
+    if(bl < rb && bl > 1e-9){
+      const n = {x:bv.x/bl, y:bv.y/bl, z:bv.z/bl};
+      P.x = bbX + n.x*rb; P.y = cy + n.y*rb; P.z = cz + n.z*rb;
+      const vn = V.x*n.x + V.y*n.y + V.z*n.z;
+      if(vn < 0){
+        const tx = V.x - vn*n.x, ty = V.y - vn*n.y, tz = V.z - vn*n.z;
+        V.x = tx*(1-mu*0.6) - eBoard*vn*n.x;
+        V.y = ty*(1-mu*0.6) - eBoard*vn*n.y;
+        V.z = tz*(1-mu*0.6) - eBoard*vn*n.z;
+        if(!touching.board) addEvent("board", t, P, Math.abs(vn));
+      }
+      touching.board = true;
+    } else touching.board = false;
+
+    // ---- floor ----
+    if(P.z < rb){
+      P.z = rb;
+      if(V.z < 0){
+        if(!touching.floor && Math.abs(V.z) > 0.4) addEvent("floor", t, P, Math.abs(V.z));
+        V.z = -eFloor*V.z;
+        V.x *= (1 - mu*0.5); V.y *= (1 - mu*0.5);
+        touching.floor = true;
+      }
+    } else touching.floor = false;
+
+    // ---- passing down through the ring ----
+    if(prev.z > H && P.z <= H){
+      const f = (prev.z - H)/(prev.z - P.z || 1e-9);
+      const cxx = prev.x + f*(P.x-prev.x), cyy = prev.y + f*(P.y-prev.y);
+      if(!firstCross) firstCross = {x:cxx, y:cyy, t};
+      if(Math.hypot(cxx, cyy) < p.R){
+        through = {t, x:cxx, y:cyy, z:H};
+        addEvent("through", t, through, Math.hypot(V.x,V.y,V.z));
+        madeFlag = true; madeT = t;
+      }
+    }
+    if(madeFlag && P.z > H){ madeFlag = false; madeT = null; }   // rattled back out
+
+    if(!quick) samples.push({t, x:P.x, y:P.y, z:P.z, vx:V.x, vy:V.y, vz:V.z});
+    nSteps++;
+
+    const speed = Math.hypot(V.x, V.y, V.z);
+    if(quick){
+      if(madeFlag && t > madeT + 0.22) break;                    // safely in
+      if(!madeFlag && P.z < H - 0.9 && V.z < 0) break;           // below the rim and falling: cannot return
+    }
+    if(P.z <= rb + 1e-3 && speed < 0.6){ restT += SIM_DT; if(restT > 0.25) break; } else restT = 0;
+    if(Math.abs(P.x) > 18 || Math.abs(P.y) > 14) break;
+    if(through && t > through.t + 0.45) break;
+  }
+
+  const made = madeFlag, madeAt = madeT;
+  if(quick) return {made, outcome:null, events:null, samples:null, firstCross};
+  const before = events.filter(e => e.type !== "through" && e.type !== "floor" && (madeAt === null || e.t <= madeAt));
+  const rimHits = events.filter(e=>e.type==="rim").length;
+  const boardHits = events.filter(e=>e.type==="board").length;
+
+  let outcome, cls;
+  if(made && before.length === 0){ outcome = "SWISH"; cls = "good"; }
+  else if(made && boardHits > 0){ outcome = "BANK — off the glass"; cls = "good"; }
+  else if(made){ outcome = "IN — off the rim"; cls = "good"; }
+  else if(rimHits === 0 && boardHits === 0){ outcome = "AIRBALL"; cls = "bad"; }
+  else if(boardHits > 0 && rimHits > 0){
+    // name them in the order they actually happened
+    const first = events.find(e=>e.type==="rim"||e.type==="board");
+    outcome = first && first.type==="rim" ? "MISS — iron, then glass" : "MISS — glass, then iron";
+    cls = "bad";
+  }
+  else if(boardHits > 0){ outcome = "MISS — off the glass"; cls = "bad"; }
+  else { outcome = "MISS — off the rim"; cls = "bad"; }
+
+  const rimT = events.find(e=>e.type==="through") || events.find(e=>e.type==="rim") || events.find(e=>e.type==="board");
+  return {samples, events, made, outcome, cls, rimHits, boardHits, firstCross, cleanEntry: made && before.length===0,
+          tEnd: samples[samples.length-1].t, firstContact: before[0] || null, arriveT: rimT ? rimT.t : null,
+          v0: v0, launchSpeed: v0};
+}
+
+/* ================================================================== *
+ * SENSITIVITY — which settings actually make the shot
+ *
+ * Sweeps one control across its range, running the full contact sim at
+ * each step, so bank shots and friendly rolls count as makes just like a
+ * swish does. Boundaries are then refined by bisection.
+ * ================================================================== */
+// A stripped model carrying only what simulate() reads.
+function miniModel(sv){
+  const p = { L:sv.dist, h0:sv.playerH/100 + sv.rel/100, H:sv.rimH,
+              Drim:sv.rimD*IN, dball:sv.ballD*IN, th:sv.angle*D2R };
+  p.dy = p.H - p.h0; p.R = p.Drim/2; p.r = p.dball/2;
+  let off = sv.off; if(Math.abs(off) > p.L) off = Math.sign(off)*p.L;
+  const v = requiredV(p.th, p.L, p.dy);
+  if(v === null || v > 40) return null;
+  const cr = crossing(v, p.th, p.h0, p.H);
+  if(!cr) return null;
+  return {ok:true, p, s:Object.assign({}, sv, {off}), v, alpha: sv.aim*D2R};
+}
+function madeWith(base, id, val){
+  const mm = miniModel(Object.assign({}, base, {[id]: val}));
+  if(!mm) return null;                                  // not physically reachable
+  return simulate(mm, {quick:true}).made;
+}
+
+function sweepAttribute(id, base, n){
+  const it = ITEMS.find(x=>x.id===id);
+  if(!it) return null;
+  n = n || 72;
+  const lo = it.min, hi = it.max, step = (hi-lo)/n;
+  const grid = [];
+  for(let i=0;i<=n;i++){
+    const v = lo + step*i;
+    grid.push({v, made: madeWith(base, id, v)});
+  }
+  const feasible = grid.filter(q=>q.made !== null).length * step;
+
+  // refine each made/not-made transition
+  const edge = (a, b)=>{                                 // a made, b not
+    let A = a, B = b;
+    for(let k=0;k<14;k++){ const mid=(A+B)/2; if(madeWith(base, id, mid) === true) A = mid; else B = mid; }
+    return A;
+  };
+  const bands = [];
+  let start = null;
+  for(let i=0;i<grid.length;i++){
+    const on = grid[i].made === true;
+    if(on && start === null) start = i>0 ? edge(grid[i].v, grid[i-1].v) : grid[i].v;
+    if(!on && start !== null){ bands.push([start, edge(grid[i-1].v, grid[i].v)]); start = null; }
+  }
+  if(start !== null) bands.push([start, grid[grid.length-1].v]);
+
+  const total = bands.reduce((a,b)=>a + (b[1]-b[0]), 0);
+  const cur = base[id];
+  const here = bands.find(b => cur >= b[0]-1e-9 && cur <= b[1]+1e-9) || null;
+  return {id, lo, hi, bands, total, feasible, here, cur, unit:(DECIDERS.find(d=>d.id===id)||{}).unit||"",
+          dp:(DECIDERS.find(d=>d.id===id)||{}).dp ?? 2};
+}
+
+let sens = {decider:"angle", res:null, force:null, busy:false};
+
+function runSensitivity(){
+  const m = model;
+  if(!m || !m.ok){ sens.res = null; sens.force = null; renderBands(); drawVerdict(); return; }
+  const base = m.s;
+  sens.force = sweepAttribute("trim", base, 72);
+  sens.res   = sens.decider === "trim" ? sens.force : sweepAttribute(sens.decider, base, 72);
+  renderBands(); drawVerdict();
+}
+
+let sensTimer = null;
+function scheduleSensitivity(){
+  clearTimeout(sensTimer);
+  sens.busy = true; renderBands();
+  sensTimer = setTimeout(()=>{ sens.busy = false; try{ runSensitivity(); }catch(e){ console.error("sensitivity failed:", e); } }, 70);
+}
+
+// paint the viable segments onto the slider tracks
+function renderBands(){
+  for(const it of ITEMS){
+    const el = document.getElementById("bands-"+it.id);
+    if(!el) continue;
+    const r = (sens.res && sens.res.id===it.id) ? sens.res : (sens.force && sens.force.id===it.id ? sens.force : null);
+    if(!r){ el.innerHTML = ""; el.classList.remove("live"); continue; }
+    el.classList.add("live");
+    if(sens.busy){ el.innerHTML = '<i class="pending"></i>'; continue; }
+    el.innerHTML = r.bands.map(b=>{
+      const a = (b[0]-r.lo)/(r.hi-r.lo)*100, w = (b[1]-b[0])/(r.hi-r.lo)*100;
+      return '<i style="left:'+a.toFixed(3)+'%;width:'+Math.max(0.4,w).toFixed(3)+'%"></i>';
+    }).join("");
+  }
+  renderSensText();
+}
+
+function renderSensText(){
+  const host = document.getElementById("sens-out");
+  if(!host) return;
+  if(sens.busy){ host.innerHTML = "computing viable ranges…"; return; }
+  const r = sens.res, f = sens.force, m = model;
+  if(!r || !m || !m.ok){ host.innerHTML = "—"; return; }
+  const d = DECIDERS.find(x=>x.id===r.id) || {label:r.id};
+  const n = v => fx(v, r.dp)+r.unit;
+  const out = [];
+  if(!r.bands.length){
+    out.push('<span class="none">No value of '+d.label.toLowerCase()+' makes this shot.</span>');
+  }else{
+    out.push(r.here
+      ? 'Makes it from <b>'+n(r.here[0])+' to '+n(r.here[1])+'</b> — '+n(r.here[1]-r.here[0])+' wide.'
+      : '<span class="none">Current setting misses.</span> Nearest band: '+n(r.bands[0][0])+'–'+n(r.bands[0][1])+'.');
+    const pct = r.feasible > 0 ? r.total/r.feasible*100 : 0;
+    out.push('Green covers <b>'+fx(pct,1)+'%</b> of the '+n(r.feasible)+' reachable range'+
+             (r.bands.length>1 ? ' across '+r.bands.length+' separate bands.' : '.'));
+    const widest = r.bands.reduce((a,b)=>(b[1]-b[0])>(a[1]-a[0])?b:a, r.bands[0]);
+    const slivers = r.bands.filter(b=>(b[1]-b[0]) < (widest[1]-widest[0])*0.25).length;
+    if(slivers) out.push('<span style="color:var(--txt-faint)">'+slivers+' narrow band'+(slivers>1?'s are':' is')+
+      ' lucky rim-rolls — real, but not repeatable. Trust the wide one.</span>');
+  }
+  if(f && f.bands.length && m.v){
+    const spanLo = Math.min(...f.bands.map(b=>b[0])), spanHi = Math.max(...f.bands.map(b=>b[1]));
+    out.push('Force: <b>'+fx(m.v*(1+spanLo/100),2)+'–'+fx(m.v*(1+spanHi/100),2)+' m/s</b> ('+
+             (spanLo>0?"+":"")+fx(spanLo,1)+'% to '+(spanHi>0?"+":"")+fx(spanHi,1)+'%).');
+  }
+  host.innerHTML = out.join("<br>");
+}
+
+/* ---------------- camera & projection ---------------- */
+const cam = {az:-0.78, el:0.30, dist:11, tx:2.4, ty:0, tz:1.9, preset:"corner"};
+
+function camApply(name){
+  const m = model; if(!m) return;
+  const rel = shooterWorld(m.p, m.s);
+  const wide = {tx: rel.x*0.5, ty: rel.y*0.5, tz: 1.95, dist: m.p.L*0.95 + 4.5};
+  const near = {tx: 0, ty: 0, tz: m.p.H, dist: 1.9};
+  const P = {
+    side:    {az:-Math.PI/2, el:0.10, ...wide},
+    shooter: {az: 0.02,      el:0.20, ...wide},
+    top:     {az:-0.55,      el:1.05, ...wide},
+    corner:  {az:-0.78,      el:0.30, ...wide},
+    rimcam:  {az:-1.05,      el:0.26, ...near}
+  }[name];
+  if(!P) return;
+  Object.assign(cam, P, {preset:name});
+  document.querySelectorAll(".views button").forEach(b=>b.classList.toggle("is-on", b.dataset.cam===name));
+}
+
+// Projects into the sub-viewport at (vx,vy) sized vw×vh, so the same code
+// serves both the main scene and the rim close-up inset.
+function makeProjector(vx, vy, vw, vh, C){
+  C = C || cam;
+  const ce = Math.cos(C.el), se = Math.sin(C.el);
+  const eye = {x: C.tx + C.dist*ce*Math.cos(C.az),
+               y: C.ty + C.dist*ce*Math.sin(C.az),
+               z: C.tz + C.dist*se};
+  let f = {x: C.tx-eye.x, y: C.ty-eye.y, z: C.tz-eye.z};
+  const fl = Math.hypot(f.x,f.y,f.z); f = {x:f.x/fl, y:f.y/fl, z:f.z/fl};
+  let r = {x: f.y*1 - f.z*0, y: f.z*0 - f.x*1, z: f.x*0 - f.y*0};   // f × up, up=(0,0,1)
+  r = {x: f.y, y: -f.x, z: 0};
+  const rl = Math.hypot(r.x,r.y,r.z) || 1; r = {x:r.x/rl, y:r.y/rl, z:r.z/rl};
+  const u = {x: r.y*f.z - r.z*f.y, y: r.z*f.x - r.x*f.z, z: r.x*f.y - r.y*f.x};
+  const focal = (vh/2)/Math.tan((C.fov||50)*D2R/2);
+  return function(P){
+    const dx = P.x-eye.x, dy = P.y-eye.y, dz = P.z-eye.z;
+    const cz = dx*f.x + dy*f.y + dz*f.z;
+    if(cz < 0.02) return null;
+    const cx = dx*r.x + dy*r.y + dz*r.z;
+    const cyy = dx*u.x + dy*u.y + dz*u.z;
+    return {x: vx + vw/2 + focal*cx/cz, y: vy + vh/2 - focal*cyy/cz, z: cz, s: focal/cz};
+  };
+}
+
+// Where the ball's great circle sits in the ring plane: tracks the ball on the
+// way in, then freezes at the crossing point instead of following it down.
+function rimCrossAnchor(m){
+  const sim = m.sim; if(!sim) return null;
+  const crossed = sim.firstCross && pb.t >= sim.firstCross.t;
+  const a = crossed ? sim.firstCross : sampleAt(sim, pb.t);
+  if(!a) return null;
+  const off = Math.hypot(a.x, a.y);
+  return {x:a.x, y:a.y, off, fit: m.p.R - off - m.p.r, crossed:!!crossed};
+}
+
+// The ball at its widest, drawn in the ring plane for a true-scale comparison.
+function pushCrossSection(items, ctx, pr, m, A, lw){
+  const p = m.p, NC = 56, col = A.fit > 0 ? "rgba(255,180,120,.95)" : "#ff5d5d";
+  for(let i=0;i<NC;i++){
+    const a0 = 2*Math.PI*i/NC, a1 = 2*Math.PI*(i+1)/NC;
+    const q0 = pr({x:A.x + p.r*Math.cos(a0), y:A.y + p.r*Math.sin(a0), z:p.H});
+    const q1 = pr({x:A.x + p.r*Math.cos(a1), y:A.y + p.r*Math.sin(a1), z:p.H});
+    if(!q0 || !q1) continue;
+    items.push({d:(q0.z+q1.z)/2 - 0.0005, fn:()=>{
+      ctx.strokeStyle = col; ctx.lineWidth = lw;
+      dash(ctx,[4,3],()=>{ ctx.beginPath(); ctx.moveTo(q0.x,q0.y); ctx.lineTo(q1.x,q1.y); ctx.stroke(); });
+    }});
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  if(ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else {
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+    ctx.closePath();
+  }
+}
+
+/* Rim close-up inset — a fixed camera looking down into the ring from the
+   shooter's side, so the entry point is legible whatever the main camera does. */
+function drawRimInset(ctx, W, H){
+  const m = model, p = m.p, sim = m.sim;
+  const iw = clamp(W*0.30, 200, 310), ih = iw*0.76;
+  const ix = W - iw - 14, iy = 14;
+
+  ctx.save();
+  roundRect(ctx, ix, iy, iw, ih, 9); ctx.clip();
+  ctx.fillStyle = "#060a0f"; ctx.fillRect(ix, iy, iw, ih);
+
+  const rel = shooterWorld(p, m.s);
+  const C = {az: Math.atan2(rel.y, rel.x), el: 0.50, dist: 1.15, tx:0, ty:0, tz:p.H+0.05, fov:48};
+  const pr = makeProjector(ix, iy, iw, ih, C);
+  const items = [];
+  const seg = (A,B,st,lw)=>{ const a=pr(A), b=pr(B); if(!a||!b) return;
+    items.push({d:(a.z+b.z)/2, fn:()=>{ ctx.strokeStyle=st; ctx.lineWidth=lw;
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }}); };
+
+  // backboard, so the orientation of the close-up is unambiguous
+  (function(){
+    const bx=-BB.off, z0=p.H-BB.drop, z1=z0+BB.h, hw=BB.w/2;
+    const q=[{x:bx,y:-hw,z:z0},{x:bx,y:hw,z:z0},{x:bx,y:hw,z:z1},{x:bx,y:-hw,z:z1}].map(pr);
+    if(q.some(v=>!v)) return;
+    items.push({d:(q[0].z+q[2].z)/2 + 0.01, fn:()=>{
+      ctx.beginPath(); q.forEach((v,i)=> i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)); ctx.closePath();
+      ctx.fillStyle="rgba(150,190,225,.13)"; ctx.fill();
+      ctx.strokeStyle="#5d7a9e"; ctx.lineWidth=1.6; ctx.stroke();
+    }});
+    const sw=BB.sqW/2;
+    const s=[{x:bx,y:-sw,z:p.H},{x:bx,y:sw,z:p.H},{x:bx,y:sw,z:p.H+BB.sqH},{x:bx,y:-sw,z:p.H+BB.sqH}].map(pr);
+    if(s.some(v=>!v)) return;
+    items.push({d:(s[0].z+s[2].z)/2, fn:()=>{
+      ctx.beginPath(); s.forEach((v,i)=> i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)); ctx.closePath();
+      ctx.strokeStyle="#c8d8ea"; ctx.lineWidth=1.4; ctx.stroke();
+    }});
+  })();
+
+  const Rc = p.R + TUBE, N = 64;
+  for(let i=0;i<N;i++){
+    const a0=2*Math.PI*i/N, a1=2*Math.PI*(i+1)/N;
+    seg({x:Rc*Math.cos(a0),y:Rc*Math.sin(a0),z:p.H},{x:Rc*Math.cos(a1),y:Rc*Math.sin(a1),z:p.H},"#e0503a",5);
+  }
+  for(let i=0;i<12;i++){
+    const a=2*Math.PI*i/12, a2=2*Math.PI*(i+0.5)/12;
+    seg({x:Rc*Math.cos(a),y:Rc*Math.sin(a),z:p.H},
+        {x:0.62*Rc*Math.cos(a2),y:0.62*Rc*Math.sin(a2),z:p.H-0.40},"rgba(190,205,225,.4)",1);
+  }
+
+  // The ball's WIDEST cross-section (its great circle, radius r) drawn in the
+  // ring plane, so ball width and ring opening are compared at true scale.
+  // Anchored at the ring plane: it tracks the ball on the way in, then FREEZES at
+  // the crossing point rather than sliding away as the ball falls through.
+  const A = rimCrossAnchor(m);
+  const fit = A ? A.fit : null;
+  if(A) pushCrossSection(items, ctx, pr, m, A, 1.6);
+
+  // where the ball's centre actually crosses the ring plane
+  const X = sim && sim.firstCross;
+  if(X){
+    const inRing = Math.hypot(X.x, X.y) < p.R;
+    const col = inRing ? "#3ddc97" : "#ff5d5d";
+    const a = pr({x:X.x, y:X.y, z:p.H});
+    if(a) items.push({d:a.z-0.001, fn:()=>{
+      ctx.strokeStyle=col; ctx.lineWidth=1.6;
+      ctx.beginPath(); ctx.moveTo(a.x-7,a.y); ctx.lineTo(a.x+7,a.y);
+      ctx.moveTo(a.x,a.y-7); ctx.lineTo(a.x,a.y+7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(a.x,a.y,4,0,7); ctx.stroke();
+    }});
+    const b = pr({x:X.x, y:X.y, z:p.H+0.5});
+    if(a && b) items.push({d:a.z, fn:()=>{
+      ctx.globalAlpha=.35; ctx.strokeStyle=col; ctx.lineWidth=1;
+      dash(ctx,[3,3],()=>{ ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(a.x,a.y); ctx.stroke(); });
+      ctx.globalAlpha=1;
+    }});
+  }
+
+  // path through the close-up volume + the ball
+  if(sim){
+    const near = sim.samples.filter(q=>q.t<=pb.t && Math.abs(q.z-p.H)<0.75 && Math.hypot(q.x,q.y)<1.4).map(pr).filter(Boolean);
+    if(near.length>1) items.push({d:1e-4, fn:()=>{
+      ctx.strokeStyle="rgba(255,138,61,.8)"; ctx.lineWidth=2;
+      ctx.beginPath(); near.forEach((q,i)=> i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)); ctx.stroke();
+    }});
+    const b = sampleAt(sim, pb.t);
+    const a = b && pr(b);
+    if(a){
+      const rr = Math.max(2, p.r*a.s);
+      items.push({d:a.z, fn:()=>{
+        const gr=ctx.createRadialGradient(a.x-rr*.35,a.y-rr*.4,rr*.12,a.x,a.y,rr);
+        gr.addColorStop(0,"#ffbf85"); gr.addColorStop(.65,"#e8762f"); gr.addColorStop(1,"#a8461a");
+        ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(a.x,a.y,rr,0,7); ctx.fill();
+        ctx.strokeStyle="rgba(50,18,4,.6)"; ctx.lineWidth=1; ctx.stroke();
+      }});
+    }
+  }
+
+  items.sort((A,B)=>B.d-A.d);
+  for(const it of items) it.fn();
+
+  label(ctx, "RIM CLOSE-UP", ix+9, iy+14, {color:"#8b9bb0", size:9.5, weight:"700"});
+  label(ctx, "dashed = ball at its widest ("+fx(p.dball/IN,1)+"″ vs "+fx(p.Drim/IN,1)+"″ ring)",
+        ix+9, iy+27, {color:"#5d6c80", size:9});
+  if(fit !== null){
+    label(ctx, fit > 0 ? fx(fit*100,1)+" cm of ring left on the near side"
+                       : "overlaps the ring by "+fx(-fit*100,1)+" cm",
+          ix+9, iy+ih-22, {color: fit>0 ? "#3ddc97" : "#ff5d5d", size:10, weight:"600"});
+  }
+  if(X){
+    const inRing = Math.hypot(X.x, X.y) < p.R;
+    label(ctx, inRing ? "entry "+fx(Math.hypot(X.x,X.y)*100,1)+" cm off centre"
+                      : "crosses "+fx((Math.hypot(X.x,X.y)-p.R)*100,1)+" cm outside the ring",
+          ix+9, iy+ih-8, {color: inRing?"#3ddc97":"#ff5d5d", size:10, weight:"600"});
+  }else{
+    label(ctx, "never reaches the ring plane", ix+9, iy+ih-8, {color:"#ff5d5d", size:10, weight:"600"});
+  }
+  ctx.restore();
+
+  roundRect(ctx, ix, iy, iw, ih, 9);
+  ctx.strokeStyle="#2a3b58"; ctx.lineWidth=1; ctx.stroke();
+}
+
+/* ---------------- scene ---------------- */
+function drawScene(){
+  const {ctx, w, h} = fit(document.getElementById("scene"));
+  if(w < 60 || h < 60) return;
+  const m = model;
+  ctx.fillStyle = "#080c12"; ctx.fillRect(0,0,w,h);
+  if(!m || !m.ok || !m.sim){
+    label(ctx, m && !m.ok ? "no valid trajectory — raise the launch angle" : "…", w/2, h/2,
+          {color:"#ff5d5d", size:13, align:"center"});
+    return;
+  }
+  const p = m.p, pr = makeProjector(0, 0, w, h, cam), items = [];
+  const seg = (A,B,style,width,depthBias)=>{
+    const a = pr(A), b = pr(B); if(!a||!b) return;
+    items.push({d:(a.z+b.z)/2 + (depthBias||0), fn:()=>{
+      ctx.strokeStyle = style; ctx.lineWidth = width;
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    }});
+  };
+
+  // ---- court markings on the floor ----
+  const CL = "#1d2942", CL2 = "#2a3b58";
+  const line = (x0,y0,x1,y1,c)=>seg({x:x0,y:y0,z:0},{x:x1,y:y1,z:0}, c||CL, 1.5);
+  const BASE = -1.575;
+  line(BASE,-7.62,BASE,7.62,CL2);
+  line(BASE,-7.62,11.5,-7.62); line(BASE,7.62,11.5,7.62);
+  line(BASE,-2.44,4.215,-2.44); line(BASE,2.44,4.215,2.44); line(4.215,-2.44,4.215,2.44);
+  for(let i=0;i<40;i++){                                    // free-throw circle
+    const a0=2*Math.PI*i/40, a1=2*Math.PI*(i+1)/40;
+    line(4.215+1.8*Math.cos(a0),1.8*Math.sin(a0), 4.215+1.8*Math.cos(a1),1.8*Math.sin(a1));
+  }
+  const A3=7.24, CX3=6.71, CY3=Math.sqrt(A3*A3-CX3*CX3);
+  line(BASE,-CX3,CY3,-CX3,CL2); line(BASE,CX3,CY3,CX3,CL2);
+  const tA=Math.atan2(CX3,CY3);
+  for(let i=0;i<60;i++){
+    const a0=-tA+(2*tA)*i/60, a1=-tA+(2*tA)*(i+1)/60;
+    line(A3*Math.cos(a0),A3*Math.sin(a0), A3*Math.cos(a1),A3*Math.sin(a1), CL2);
+  }
+
+  // ---- backboard ----
+  const bx=-BB.off, z0=p.H-BB.drop, z1=z0+BB.h, hw=BB.w/2;
+  (function(){
+    const c=[{x:bx,y:-hw,z:z0},{x:bx,y:hw,z:z0},{x:bx,y:hw,z:z1},{x:bx,y:-hw,z:z1}].map(pr);
+    if(c.some(q=>!q)) return;
+    items.push({d:(c[0].z+c[2].z)/2, fn:()=>{
+      ctx.beginPath(); c.forEach((q,i)=> i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)); ctx.closePath();
+      ctx.fillStyle="rgba(150,190,225,.11)"; ctx.fill();
+      ctx.strokeStyle="#5d7a9e"; ctx.lineWidth=2; ctx.stroke();
+    }});
+    const sw=BB.sqW/2, sz0=p.H, sz1=p.H+BB.sqH;
+    const sq=[{x:bx,y:-sw,z:sz0},{x:bx,y:sw,z:sz0},{x:bx,y:sw,z:sz1},{x:bx,y:-sw,z:sz1}].map(pr);
+    if(sq.some(q=>!q)) return;
+    items.push({d:(sq[0].z+sq[2].z)/2 - 0.02, fn:()=>{
+      ctx.beginPath(); sq.forEach((q,i)=> i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)); ctx.closePath();
+      ctx.strokeStyle="#c8d8ea"; ctx.lineWidth=1.6; ctx.stroke();
+    }});
+  })();
+  seg({x:bx,y:0,z:z1},{x:bx-0.7,y:0,z:z1},"#2a3b58",3);
+  seg({x:bx-0.7,y:0,z:z1},{x:bx-0.7,y:0,z:0},"#2a3b58",3);
+
+  // ---- rim + net ----
+  const Rc = p.R + TUBE, NSEG = 56;
+  for(let i=0;i<NSEG;i++){
+    const a0=2*Math.PI*i/NSEG, a1=2*Math.PI*(i+1)/NSEG;
+    seg({x:Rc*Math.cos(a0),y:Rc*Math.sin(a0),z:p.H},{x:Rc*Math.cos(a1),y:Rc*Math.sin(a1),z:p.H},"#e0503a",4);
+  }
+  for(let i=0;i<12;i++){
+    const a=2*Math.PI*i/12, a2=2*Math.PI*(i+0.5)/12;
+    seg({x:Rc*Math.cos(a),y:Rc*Math.sin(a),z:p.H},
+        {x:0.62*Rc*Math.cos(a2),y:0.62*Rc*Math.sin(a2),z:p.H-0.42},"rgba(190,205,225,.5)",1);
+  }
+  for(const [rr,zz] of [[0.86,p.H-0.16],[0.66,p.H-0.34]]){
+    for(let i=0;i<24;i++){
+      const a0=2*Math.PI*i/24, a1=2*Math.PI*(i+1)/24;
+      seg({x:rr*Rc*Math.cos(a0),y:rr*Rc*Math.sin(a0),z:zz},{x:rr*Rc*Math.cos(a1),y:rr*Rc*Math.sin(a1),z:zz},"rgba(190,205,225,.32)",1);
+    }
+  }
+
+  // ---- shooter ----
+  const rel = shooterWorld(p, m.s);
+  seg({x:rel.x,y:rel.y,z:0},{x:rel.x,y:rel.y,z:rel.z},"#3d4d66",2.5);
+  seg({x:rel.x,y:rel.y,z:rel.z*0.55},{x:rel.x+0.22,y:rel.y,z:rel.z*0.2},"#3d4d66",2);
+
+  // ---- flight path ----
+  const sim = m.sim, tNow = pb.t;
+  (function(){
+    const pts=[]; for(const q of sim.samples){ if(q.t>tNow) break; const a=pr(q); if(a) pts.push(a); }
+    if(pts.length<2) return;
+    items.push({d:1e-4, fn:()=>{
+      ctx.strokeStyle="rgba(255,138,61,.75)"; ctx.lineWidth=2;
+      ctx.beginPath(); pts.forEach((q,i)=> i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)); ctx.stroke();
+    }});
+    const ghost=[]; for(const q of sim.samples){ if(q.t<=tNow) continue; const a=pr(q); if(a) ghost.push(a); }
+    if(ghost.length>1) items.push({d:1e-4, fn:()=>{
+      ctx.strokeStyle="rgba(255,138,61,.16)"; ctx.lineWidth=1.2;
+      dash(ctx,[4,5],()=>{ ctx.beginPath(); ghost.forEach((q,i)=> i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y)); ctx.stroke(); });
+    }});
+  })();
+
+  // ---- ball's cross-section at the ring, shown while paused ----
+  if(!pb.playing){
+    const A = rimCrossAnchor(m);
+    if(A){
+      pushCrossSection(items, ctx, pr, m, A, 2);
+      const lbl = pr({x:A.x, y:A.y, z:p.H});
+      if(lbl) items.push({d:lbl.z-0.002, fn:()=>{
+        label(ctx, (A.fit>0 ? fx(A.fit*100,1)+" cm clear" : "clips by "+fx(-A.fit*100,1)+" cm"),
+              lbl.x, lbl.y+16, {color: A.fit>0?"#3ddc97":"#ff5d5d", size:10.5, align:"center", weight:"600"});
+      }});
+    }
+  }
+
+  // ---- contact markers ----
+  for(const e of sim.events){
+    if(e.t > tNow + 1e-6 || e.type==="floor") continue;
+    const a = pr(e); if(!a) continue;
+    const col = e.type==="rim" ? "#e0503a" : e.type==="board" ? "#4cc9f0" : "#3ddc97";
+    items.push({d:a.z-0.01, fn:()=>{
+      ctx.strokeStyle=col; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(a.x,a.y,7,0,7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(a.x,a.y,2,0,7); ctx.fillStyle=col; ctx.fill();
+    }});
+  }
+
+  // ---- ball + shadow ----
+  const b = sampleAt(sim, tNow);
+  if(b){
+    const sh = pr({x:b.x, y:b.y, z:0.002});
+    if(sh) items.push({d:sh.z+0.5, fn:()=>{
+      ctx.fillStyle="rgba(0,0,0,.35)";
+      ctx.beginPath(); ctx.ellipse(sh.x, sh.y, p.r*sh.s*1.05, p.r*sh.s*0.42, 0, 0, 7); ctx.fill();
+    }});
+    const a = pr(b);
+    if(a){
+      const rr = Math.max(2, p.r*a.s);
+      items.push({d:a.z, fn:()=>{
+        const gr = ctx.createRadialGradient(a.x-rr*0.35, a.y-rr*0.4, rr*0.12, a.x, a.y, rr);
+        gr.addColorStop(0,"#ffbf85"); gr.addColorStop(0.65,"#e8762f"); gr.addColorStop(1,"#a8461a");
+        ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(a.x,a.y,rr,0,7); ctx.fill();
+        ctx.strokeStyle="rgba(50,18,4,.6)"; ctx.lineWidth=Math.max(0.6,rr*0.06);
+        ctx.beginPath(); ctx.arc(a.x,a.y,rr,0,7); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(a.x,a.y,rr,rr*0.38,0.5,0,7); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(a.x,a.y,rr*0.38,rr,0.5,0,7); ctx.stroke();
+      }});
+    }
+  }
+
+  items.sort((A,B)=>B.d-A.d);
+  for(const it of items) it.fn();
+
+  // HUD
+  label(ctx, sim.outcome, 14, 22, {color: sim.made ? "#3ddc97" : "#ff5d5d", size:15, weight:"700"});
+  label(ctx, fx(tNow,3)+" s  ·  "+fx(m.s.trim,1)+"% trim  ·  "+fx(m.s.aim,2)+"° aim", 14, 40,
+        {color:"#8b9bb0", size:11});
+  label(ctx, cam.preset+" view · drag to orbit", 14, h-10, {color:"#3b4a60", size:10});
+  try{ drawRimInset(ctx, w, h); }catch(err){ console.error("rim inset failed:", err); }
+}
+
+function sampleAt(sim, t){
+  const S = sim.samples;
+  if(!S.length) return null;
+  if(t <= 0) return S[0];
+  if(t >= S[S.length-1].t) return S[S.length-1];
+  let lo = 0, hi = S.length-1;
+  while(hi - lo > 1){ const mid = (lo+hi)>>1; if(S[mid].t <= t) lo = mid; else hi = mid; }
+  const f = (t - S[lo].t)/((S[hi].t - S[lo].t) || 1e-9);
+  return {t, x:S[lo].x+f*(S[hi].x-S[lo].x), y:S[lo].y+f*(S[hi].y-S[lo].y), z:S[lo].z+f*(S[hi].z-S[lo].z)};
+}
+
+/* ---------------- playback transport ---------------- */
+const pb = {t:0, playing:true, speed:1};
+const SPEEDS = [0.05, 0.1, 0.25, 0.5, 1, 2];
+
+(function buildTransport(){
+  const host = document.getElementById("t-speeds");
+  SPEEDS.forEach(v=>{
+    const b = document.createElement("button");
+    b.type="button"; b.textContent = (v<1? v.toString().replace("0.",".") : v)+"×";
+    b.classList.toggle("is-on", v===pb.speed);
+    b.addEventListener("click", ()=>{
+      pb.speed = v;
+      [...host.children].forEach(c=>c.classList.toggle("is-on", c===b));
+    });
+    host.appendChild(b);
+  });
+  const play = document.getElementById("t-play");
+  play.addEventListener("click", ()=>{
+    if(model && model.sim && pb.t >= model.sim.tEnd - 1e-6) pb.t = 0;
+    pb.playing = !pb.playing; play.textContent = pb.playing ? "Pause" : "Play";
+  });
+  document.getElementById("t-back").addEventListener("click", ()=>{ pb.playing=false; play.textContent="Play"; pb.t = Math.max(0, pb.t - SIM_DT*4); });
+  document.getElementById("t-fwd").addEventListener("click", ()=>{ pb.playing=false; play.textContent="Play"; pb.t = Math.min(model.sim.tEnd, pb.t + SIM_DT*4); });
+  document.getElementById("t-scrub").addEventListener("input", e=>{
+    if(!model || !model.sim) return;
+    pb.playing = false; play.textContent = "Play";
+    pb.t = model.sim.tEnd * (+e.target.value/1000);
+  });
+  document.querySelectorAll(".views button").forEach(b=>
+    b.addEventListener("click", ()=>{ camApply(b.dataset.cam); }));
+})();
+
+function syncTransport(){
+  const m = model; if(!m || !m.sim) return;
+  document.getElementById("t-scrub").value = Math.round(1000*pb.t/(m.sim.tEnd||1));
+  document.getElementById("t-time").textContent = fx(pb.t,3)+" s";
+}
+
+function drawEvents(){
+  const m = model, host = document.getElementById("events");
+  if(!m || !m.sim){ host.innerHTML = ""; return; }
+  const words = {rim:"Rim contact", board:"Backboard contact", through:"Passes down through the ring", floor:"Floor bounce"};
+  const rows = m.sim.events.map(e=>
+    '<div class="ev '+e.type+'" data-t="'+e.t+'"><span class="t">'+fx(e.t,3)+' s</span>'+
+    '<span class="w">'+words[e.type]+(e.type!=="through" ? " · "+fx(e.speed,2)+" m/s into the surface" : "")+'</span></div>');
+  host.innerHTML = rows.length ? rows.join("")
+    : '<div class="ev"><span class="w">No contacts — the ball never touches iron, glass or floor within '+fx(SIM_MAX_T,1)+' s.</span></div>';
+  host.querySelectorAll(".ev[data-t]").forEach(el=>el.addEventListener("click", ()=>{
+    pb.playing = false; document.getElementById("t-play").textContent = "Play";
+    pb.t = Math.max(0, +el.dataset.t - 0.12);
+  }));
+}
+
+function drawVerdict(){
+  const m = model, host = document.getElementById("verdict");
+  if(!m || !m.ok || !m.sim){ host.innerHTML = ""; return; }
+  const S = m.sim, tiles = [];
+  const push = (k,v,s,c="")=>tiles.push('<div class="m"><div class="k">'+k+'</div><div class="v '+c+'">'+v+'</div><div class="s">'+(s||"&nbsp;")+'</div></div>');
+  push("Simulated result", S.outcome,
+       S.cleanEntry ? "clean entry — no contact" : (S.firstContact ? "first touch: "+(S.firstContact.type==="rim"?"rim":"backboard") : "never reaches the hoop"),
+       S.cls);
+  push("Can it go straight in?", m.swishNow ? "YES" : "NO",
+       m.swishNow ? "geometry allows a clean entry" : "geometry rules it out at this aim",
+       m.swishNow ? "good" : "bad");
+  push("Rim contacts", String(S.rimHits), S.rimHits ? "rattles before settling" : "no iron", S.rimHits?"warn":"good");
+  push("Backboard contacts", String(S.boardHits), S.boardHits ? "bank involved" : "no glass", S.boardHits?"cy":"good");
+  push("Release speed", fx(S.launchSpeed,2)+" m/s", fx(m.s.trim,1)+"% trim on "+fx(m.v,2)+" m/s", "or");
+  push("Time to the rim", S.arriveT!==null ? fx(S.arriveT,2)+" s" : "—", "release → first hoop event");
+  push("Sim length", fx(S.tEnd,2)+" s", S.samples.length+" steps @ "+Math.round(1/SIM_DT)+" Hz");
+  push("Agreement", (S.cleanEntry===m.swishNow) ? "consistent" : "differs",
+       "3D contact sim vs. analytic window", (S.cleanEntry===m.swishNow)?"good":"warn");
+
+  const f = sens.force;
+  if(f && f.bands.length && m.v){
+    const lo = Math.min(...f.bands.map(b=>b[0])), hi = Math.max(...f.bands.map(b=>b[1]));
+    push("Force range to score", fx(m.v*(1+lo/100),2)+"–"+fx(m.v*(1+hi/100),2),
+         "m/s · "+(lo>0?"+":"")+fx(lo,1)+"% to "+(hi>0?"+":"")+fx(hi,1)+"% of nominal", "or");
+    push("Force margin", "±"+fx((hi-lo)/2,1)+"%",
+         fx(m.v*(hi-lo)/200,2)+" m/s of slack"+(f.bands.length>1?" ("+f.bands.length+" bands)":""),
+         (hi-lo)/2 >= 3 ? "good" : (hi-lo)/2 >= 1.5 ? "warn" : "bad");
+  }else if(f){
+    push("Force range to score", "none", "no release speed in ±12% scores", "bad");
+  }
+  const r = sens.res;
+  if(r){
+    const d = DECIDERS.find(x=>x.id===r.id) || {label:r.id};
+    const pct = r.feasible > 0 ? r.total/r.feasible*100 : 0;
+    push("Room for error — "+d.label.toLowerCase(),
+         r.here ? fx(r.here[1]-r.here[0], r.dp)+r.unit : "0"+r.unit,
+         r.here ? "makes it "+fx(r.here[0],r.dp)+"–"+fx(r.here[1],r.dp)+r.unit : "current setting misses",
+         r.here ? "good" : "bad");
+    push("Viable share", fx(pct,1)+"%", "of the "+fx(r.feasible,r.dp)+r.unit+" reachable range",
+         pct >= 20 ? "good" : pct >= 8 ? "warn" : "bad");
+  }
+  host.innerHTML = tiles.join("");
+}
+
+/* ---------------- orbit controls ---------------- */
+(function orbit(){
+  const c = document.getElementById("scene");
+  let down=false, mode="orbit", lx=0, ly=0;
+  const freeCam = ()=>{ cam.preset="free"; document.querySelectorAll(".views button").forEach(b=>b.classList.remove("is-on")); };
+
+  // camera basis from the current azimuth/elevation
+  const basis = ()=>{
+    const ce=Math.cos(cam.el), se=Math.sin(cam.el), ca=Math.cos(cam.az), sa=Math.sin(cam.az);
+    const f = {x:-ce*ca, y:-ce*sa, z:-se};                     // eye → target
+    const r = {x:-sa, y:ca, z:0};                              // screen right
+    const u = {x: r.y*f.z - r.z*f.y, y: r.z*f.x - r.x*f.z, z: r.x*f.y - r.y*f.x};
+    return {f, r, u};
+  };
+  // world units per screen pixel at the target plane
+  const perPx = ()=> 2*cam.dist*Math.tan(50*D2R/2)/Math.max(1, c.getBoundingClientRect().height);
+  function pan(dx, dy){
+    const {r,u} = basis(), k = perPx();
+    cam.tx += (-dx*r.x + dy*u.x)*k;
+    cam.ty += (-dx*r.y + dy*u.y)*k;
+    cam.tz = clamp(cam.tz + (-dx*r.z + dy*u.z)*k, 0.1, 12);
+    freeCam();
+  }
+
+  const pt = e => e.touches ? e.touches[0] : e;
+  const start=e=>{
+    down=true; c.classList.add("drag");
+    mode = (e.button===2 || e.button===1 || e.shiftKey || e.metaKey || (e.touches && e.touches.length>1)) ? "pan" : "orbit";
+    lx=pt(e).clientX; ly=pt(e).clientY;
+    if(e.cancelable) e.preventDefault();
+  };
+  const move=e=>{
+    if(!down) return;
+    const x=pt(e).clientX, y=pt(e).clientY, dx=x-lx, dy=y-ly;
+    if(e.touches && e.touches.length>1) mode="pan";
+    if(mode==="pan") pan(dx, dy);
+    else{
+      cam.az -= dx*0.008;
+      cam.el = clamp(cam.el + dy*0.006, -0.35, 1.45);
+      freeCam();
+    }
+    lx=x; ly=y;
+    if(e.cancelable) e.preventDefault();
+  };
+  const end=()=>{down=false; c.classList.remove("drag");};
+  c.addEventListener("mousedown",start); window.addEventListener("mousemove",move); window.addEventListener("mouseup",end);
+  c.addEventListener("contextmenu",e=>e.preventDefault());
+  c.addEventListener("touchstart",start,{passive:false});
+  c.addEventListener("touchmove",move,{passive:false});
+  c.addEventListener("touchend",end);
+  c.addEventListener("wheel",e=>{ cam.dist = clamp(cam.dist*(1+Math.sign(e.deltaY)*0.09), 0.6, 40); e.preventDefault(); },{passive:false});
+
+  // keyboard: arrows/WASD pan, +/- zoom, R resets
+  c.tabIndex = 0;
+  c.addEventListener("keydown", e=>{
+    const S = e.shiftKey ? 34 : 14;
+    const K = {ArrowLeft:[-S,0], ArrowRight:[S,0], ArrowUp:[0,-S], ArrowDown:[0,S],
+               a:[-S,0], d:[S,0], w:[0,-S], s:[0,S]}[e.key];
+    if(K){ pan(-K[0], -K[1]); e.preventDefault(); return; }
+    if(e.key==="+"||e.key==="="){ cam.dist=clamp(cam.dist*0.9,0.6,40); e.preventDefault(); }
+    if(e.key==="-"||e.key==="_"){ cam.dist=clamp(cam.dist*1.1,0.6,40); e.preventDefault(); }
+    if(e.key==="r"||e.key==="R"){ camApply("corner"); e.preventDefault(); }
+  });
+})();
+
+/* ---------------- view switching ---------------- */
+let activeView = "analysis";
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click", ()=>{
+  activeView = b.dataset.view;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("is-on", t===b));
+  document.getElementById("view-analysis").hidden = activeView!=="analysis";
+  document.getElementById("view-sim3d").hidden   = activeView!=="sim3d";
+  if(activeView==="sim3d"){ camApply(cam.preset==="free"?"corner":cam.preset); pb.t=0; pb.playing=true;
+    document.getElementById("t-play").textContent="Pause"; }
+  drawStatic();
+}));
+
 /* ------------------------------------------------------------------ *
  * Loop & wiring
  * ------------------------------------------------------------------ */
@@ -1307,22 +2318,36 @@ function drawExplain(){
 // drawSide is included so a resize still lands even when rAF is throttled
 // (background tab) — it is otherwise refreshed by the animation loop.
 function drawStatic(){
-  drawMetrics(); drawExplain();
-  for(const fn of [drawSide, drawDetail, drawRimView, drawLanding, drawChart, drawCourt]){
+  drawMetrics(); drawExplain(); drawEvents(); drawVerdict();
+  for(const fn of [drawSide, drawDetail, drawRimView, drawLanding, drawChart, drawCourt, drawScene]){
     try{ fn(); }catch(err){ console.error(fn.name+" failed:", err); }
   }
 }
-function restart(){ anim.t = 0; }
+function restart(){
+  anim.t = 0; pb.t = 0; pb.playing = true;
+  const b = document.getElementById("t-play"); if(b) b.textContent = "Pause";
+}
 
 let last = performance.now();
 function frame(now){
   try{
     const dt = Math.min(0.05, (now-last)/1000); last = now;
-    if(model && model.ok && anim.playing){
-      anim.t += dt*model.s.speed;
-      if(anim.t > model.pathT) anim.t = 0;
+    if(activeView === "sim3d"){
+      if(model && model.sim && pb.playing){
+        pb.t += dt*pb.speed;
+        if(pb.t >= model.sim.tEnd){
+          pb.t = model.sim.tEnd; pb.playing = false;
+          document.getElementById("t-play").textContent = "Play";
+        }
+      }
+      drawScene(); syncTransport();
+    }else{
+      if(model && model.ok && anim.playing){
+        anim.t += dt*model.s.speed;
+        if(anim.t > model.pathT) anim.t = 0;
+      }
+      if(model) drawSide();
     }
-    if(model) drawSide();
   }catch(err){
     console.error("frame failed:", err);        // never let one bad frame kill the loop
   }
@@ -1339,7 +2364,15 @@ document.getElementById("reset").addEventListener("click", ()=>{
 let rt;
 window.addEventListener("resize", ()=>{ clearTimeout(rt); rt = setTimeout(drawStatic, 90); });
 
+document.getElementById("decide").addEventListener("change", e=>{
+  sens.decider = e.target.value;
+  sens.res = null; renderBands();
+  scheduleSensitivity();
+});
+
 recompute();
+camApply("corner");
+scheduleSensitivity();
 requestAnimationFrame(frame);
 </script>
 </body>

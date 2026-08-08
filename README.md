@@ -168,6 +168,75 @@ little above `θ*`, which lands entry angles in the 40–48° band that coaching
 
 ---
 
+## 3D flight & bounce
+
+The second tab replaces the analytic swish test with a full rigid-body simulation, integrated at
+600 Hz. It answers the question the geometry cannot: *if it doesn't go straight in, what happens
+next?*
+
+**Contact model.** The rim is a torus — ring centreline at `R + t`, tube radius `t = ⅝″/2` — so
+contact is `|p − nearest centreline point| < r_ball + t`, the exact condition for real steel. The
+backboard is a rounded rectangle (1.83 × 1.07 m, face 0.375 m behind the ring), which handles face
+and edge strikes alike. The floor closes the system. Each contact resolves as
+
+```
+vₙ' = −e·vₙ        vₜ' = (1 − μ)·vₜ
+```
+
+with separate restitution for rim (0.55), glass (0.72) and floor (0.76), all adjustable.
+
+**Outcome classification** is read off the simulation, not inferred: SWISH · IN — off the rim ·
+BANK — off the glass · MISS — off the rim / off the glass / iron then glass · AIRBALL. A make
+requires a downward pass through the ring that the ball never comes back out of.
+
+Sweeping release speed at 5 m produces exactly the behaviour you'd expect on a court:
+
+| Trim | Result |
+|---|---|
+| −12% … −5% | AIRBALL |
+| −3% | MISS — off the rim |
+| **0%** | **SWISH** |
+| **+1%** | **IN — off the rim** (friendly roll) |
+| +3% | MISS — iron, then glass |
+| **+5%** | **BANK — off the glass** |
+| +12% | MISS — off the glass |
+
+Note the **disjoint make bands**: 0%, +1% and +5% all score while +3% misses. Room for error is
+not one interval.
+
+**Verification.** The physics is checked headlessly: no contact ever adds energy, the ball never
+interpenetrates the rim tube or sinks through the floor, quick-mode and full-mode verdicts agree on
+27/27 cases, results are deterministic, and the sim's clean-entry verdict is cross-checked against
+the analytic window every frame (shown as "Agreement" in the verdict panel).
+
+**Playback.** Play/pause, frame step, scrub, and 0.05×–2× speeds. Contact events are listed with
+timestamps and are clickable to jump.
+
+**Camera.** Five presets (side, shooter, top, corner, rim close-up) plus free movement — drag to
+orbit, shift/right-drag or arrow keys to pan, scroll or `+`/`−` to zoom, `R` to reset.
+
+**Rim close-up inset**, pinned top-right of the scene: a fixed camera looking down into the ring
+from the shooter's side, with the backboard in frame so the orientation is unambiguous. It draws
+the ball's **widest cross-section — its great circle — in the ring plane**, so ball width and ring
+opening are compared at true scale, and reports both the entry offset from centre and the remaining
+gap to the near inner edge.
+
+That cross-section **tracks the ball on the way in, then freezes at the crossing point** rather
+than sliding away as the ball falls through — the decisive moment stays on screen. Pausing the main
+view draws the same frozen circle on the ring there too, annotated with the clearance.
+
+## Room for error, measured by simulation
+
+Pick a **deciding attribute** (launch angle, release speed, aim, distance, release height) and the
+app sweeps it across its whole range, running the contact sim at every step and bisecting the
+boundaries. The viable spans are painted **green directly onto that slider**, so you can see the
+shot's tolerance on the control you're holding.
+
+Reported alongside: the **force range** that scores (in m/s and as a % band), the width of the band
+you're currently in, and the viable share of the *physically reachable* range — a meaningful
+denominator, unlike the raw slider width. Bands far narrower than the widest one are flagged as
+lucky rim-rolls: real in simulation, but not repeatable.
+
 ## What's in the app
 
 - **Side-view trajectory** — animated ball, apex marker, release geometry, backboard/rim, the
@@ -193,7 +262,13 @@ little above `θ*`, which lands entry angles in the 40–48° band that coaching
 |---|---|
 | Player | height 150–220 cm, release height above head 10–40 cm, distance 1–10 m, lateral offset ±7 m |
 | Shot | launch angle 20–80°, aim error left/right ±3°, animation speed 0.1–3× |
+| Bounce | release speed trim ±12%, rim / backboard / floor restitution, contact friction |
 | Equipment | rim height 2.0–3.5 m (10 ft = 3.05), rim diameter 14–24 in (18), ball diameter 6–12 in (9.4) |
+
+**Distance presets** jump to the spots that matter — layup, free throw (4.19 m), mid-range,
+3-pt top (7.24 m), corner 3 (6.71 m) and FIBA 3 (6.75 m). All distances are measured to the **rim
+centre**: the free-throw line is 15 ft from the backboard face, and the face sits 0.375 m behind
+the ring, so 4.572 − 0.375 = 4.19 m.
 
 ---
 
