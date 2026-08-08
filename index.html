@@ -148,6 +148,22 @@
   .speeds button{padding:4px 8px;font-size:10.5px;border-radius:6px}
   .speeds button.is-on{background:var(--accent-2);border-color:var(--accent-2);color:#05131a}
 
+  /* simplified three-gauge strip under the 3D scene */
+  .quick{
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;
+    padding:14px 16px 16px;border-top:1px solid var(--line-soft);background:#0d131c;
+    border-radius:0 0 12px 12px;
+  }
+  @media (max-width:700px){.quick{grid-template-columns:1fr;gap:12px}}
+  .qctl .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:7px}
+  .qctl label{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .qctl output{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--txt)}
+  .qctl input[type=range]{height:26px}
+  .qctl input[type=range]::-webkit-slider-thumb{width:20px;height:20px;margin-top:-8px}
+  .qctl input[type=range]::-moz-range-thumb{width:18px;height:18px}
+  .qctl .bands{top:11px;height:4px}
+  .qhint{grid-column:1/-1;margin:-4px 0 0;font-size:10.5px;color:var(--txt-faint)}
+
   .events{padding:0 14px 13px;display:flex;flex-direction:column;gap:4px;max-height:190px;overflow:auto}
   .ev{
     display:flex;align-items:center;gap:9px;background:#0d131c;border:1px solid var(--line-soft);
@@ -220,8 +236,8 @@
     <p>How launch angle changes the size of the target the ball actually sees — and what it costs in force precision.</p>
   </div>
   <nav class="tabs">
-    <button class="tab is-on" data-view="analysis">Geometry &amp; error analysis</button>
-    <button class="tab" data-view="sim3d">3D flight &amp; bounce</button>
+    <button class="tab is-on" data-view="sim3d">3D flight &amp; bounce</button>
+    <button class="tab" data-view="analysis">Geometry &amp; error analysis</button>
   </nav>
 </header>
 
@@ -240,7 +256,7 @@
       </div>
     </aside>
 
-    <div class="stack" id="view-sim3d" hidden>
+    <div class="stack" id="view-sim3d">
 
       <section class="panel">
         <h2>3D flight &amp; bounce <em>drag to orbit · shift/right-drag or arrows to pan · scroll to zoom · R resets</em></h2>
@@ -261,6 +277,7 @@
           <span class="speeds" id="t-speeds"></span>
         </div>
         <div id="events" class="events"></div>
+        <div class="quick" id="quick"></div>
       </section>
 
       <section class="panel">
@@ -270,7 +287,7 @@
 
     </div>
 
-    <div class="stack" id="view-analysis">
+    <div class="stack" id="view-analysis" hidden>
 
       <section class="panel">
         <h2>Side view — trajectory &amp; cone of acceptance <em>shaded band = every launch angle that still swishes at this speed</em></h2>
@@ -361,6 +378,9 @@ function effortAt(p, v, trimPct){
   return (trimPct>0?"+":"")+fx(trimPct,1)+"%";
 }
 const effortUnit = ()=> effortMode==="speed" ? "m/s" : effortMode==="force" ? "N" : "%";
+// "7.56–8.25 m/s" reads better than "7.56 m/s–8.25 m/s": unit on the last value only.
+const effortSpan = (p,vLo,loPct,vHi,hiPct)=>
+  effortAt(p,vLo,loPct).replace(/\s*(m\/s|N|%)$/,"") + "–" + effortAt(p,vHi,hiPct);
 const fx = (v,d)=>(Number.isFinite(v)?v.toFixed(d):"—");
 function ftin(m){
   const t = m/0.3048, f = Math.floor(t);
@@ -668,6 +688,50 @@ const inputs = {}, outputs = {};
   }
 })();
 
+/* The three gauges a shooter actually controls, mirrored under the 3D scene.
+   They drive the same underlying inputs as the sidebar, so the two stay in step. */
+const QUICK = [
+  {id:"trim",  label:"Force"},
+  {id:"aim",   label:"Direction ◀ L / R ▶"},
+  {id:"angle", label:"Angle"}
+];
+(function buildQuick(){
+  const host = document.getElementById("quick");
+  if(!host) return;
+  for(const q of QUICK){
+    const it = ITEMS.find(x=>x.id===q.id);
+    const d = document.createElement("div");
+    d.className = "qctl";
+    d.innerHTML =
+      '<div class="row"><label for="q-'+q.id+'">'+q.label+'</label><output id="qout-'+q.id+'"></output></div>'+
+      '<div class="track-wrap"><div class="bands" id="bands-q-'+q.id+'"></div>'+
+      '<input type="range" id="q-'+q.id+'" min="'+it.min+'" max="'+it.max+'" step="'+it.step+'" value="'+it.val+'"></div>';
+    host.appendChild(d);
+    d.querySelector("input").addEventListener("input", e=>{
+      setVal(q.id, e.target.value);
+      restart(); recompute();
+    });
+  }
+  const hint = document.createElement("p");
+  hint.className = "qhint";
+  hint.textContent = "Green marks every setting that still scores. Everything else lives in the sidebar.";
+  host.appendChild(hint);
+})();
+
+// Push current values back out to the quick gauges.
+function syncQuick(s, m){
+  for(const q of QUICK){
+    const inp = document.getElementById("q-"+q.id), out = document.getElementById("qout-"+q.id);
+    if(!inp || !out) continue;
+    inp.value = s[q.id];
+    if(q.id === "trim" && m && m.ok && m.v && effortMode !== "pct"){
+      out.textContent = effortAt(m.p, m.v*(1 + s.trim/100), s.trim);
+    }else{
+      out.textContent = ITEMS.find(x=>x.id===q.id).fmt(s[q.id]);
+    }
+  }
+}
+
 (function effortToggle(){
   const seg = document.getElementById("seg-effort");
   if(!seg) return;
@@ -791,6 +855,7 @@ function recompute(){
   al.hidden = m.ok; al.textContent = m.reason;
 
   refreshEffortReadout(m);
+  syncQuick(m.s, m);
   drawStatic();
   scheduleSensitivity();
   return m;
@@ -1785,16 +1850,16 @@ function scheduleSensitivity(){
 // paint the viable segments onto the slider tracks
 function renderBands(){
   for(const it of ITEMS){
-    const el = document.getElementById("bands-"+it.id);
-    if(!el) continue;
     const r = (sens.res && sens.res.id===it.id) ? sens.res : (sens.force && sens.force.id===it.id ? sens.force : null);
-    if(!r){ el.innerHTML = ""; el.classList.remove("live"); continue; }
-    el.classList.add("live");
-    if(sens.busy){ el.innerHTML = '<i class="pending"></i>'; continue; }
-    el.innerHTML = r.bands.map(b=>{
+    const html = !r ? null : sens.busy ? '<i class="pending"></i>' : r.bands.map(b=>{
       const a = (b[0]-r.lo)/(r.hi-r.lo)*100, w = (b[1]-b[0])/(r.hi-r.lo)*100;
       return '<i style="left:'+a.toFixed(3)+'%;width:'+Math.max(0.4,w).toFixed(3)+'%"></i>';
     }).join("");
+    for(const el of [document.getElementById("bands-"+it.id), document.getElementById("bands-q-"+it.id)]){
+      if(!el) continue;
+      if(html === null){ el.innerHTML = ""; el.classList.remove("live"); }
+      else { el.classList.add("live"); el.innerHTML = html; }
+    }
   }
   renderSensText();
 }
@@ -1826,7 +1891,7 @@ function renderSensText(){
     const spanLo = Math.min(...f.bands.map(b=>b[0])), spanHi = Math.max(...f.bands.map(b=>b[1]));
     const vLo = m.v*(1+spanLo/100), vHi = m.v*(1+spanHi/100);
     const lbl = effortMode==="force" ? "Force" : effortMode==="speed" ? "Release speed" : "Force";
-    out.push(lbl+': <b>'+effortAt(m.p,vLo,spanLo)+'–'+effortAt(m.p,vHi,spanHi)+'</b>'+
+    out.push(lbl+': <b>'+effortSpan(m.p,vLo,spanLo,vHi,spanHi)+'</b>'+
              (effortMode==="pct" ? ' ('+fx(vLo,2)+'–'+fx(vHi,2)+' m/s).' : ' ('+(spanLo>0?"+":"")+fx(spanLo,1)+'% to '+(spanHi>0?"+":"")+fx(spanHi,1)+'%).'));
   }
   host.innerHTML = out.join("<br>");
@@ -2320,7 +2385,7 @@ function drawEvents(){
 function drawVerdict(){
   const m = model, host = document.getElementById("verdict");
   if(!m || !m.ok || !m.sim){ host.innerHTML = ""; return; }
-  const S = m.sim, tiles = [];
+  const S = m.sim, p = m.p, tiles = [];
   const push = (k,v,s,c="")=>tiles.push('<div class="m"><div class="k">'+k+'</div><div class="v '+c+'">'+v+'</div><div class="s">'+(s||"&nbsp;")+'</div></div>');
   push("Simulated result", S.outcome,
        S.cleanEntry ? "clean entry — no contact" : (S.firstContact ? "first touch: "+(S.firstContact.type==="rim"?"rim":"backboard") : "never reaches the hoop"),
@@ -2341,7 +2406,7 @@ function drawVerdict(){
     const lo = Math.min(...f.bands.map(b=>b[0])), hi = Math.max(...f.bands.map(b=>b[1]));
     const vLo = m.v*(1+lo/100), vHi = m.v*(1+hi/100);
     push(effortMode==="speed" ? "Release speed to score" : "Force range to score",
-         effortAt(p,vLo,lo)+"–"+effortAt(p,vHi,hi).replace(/ (m\/s|N|%)$/,""),
+         effortSpan(p,vLo,lo,vHi,hi),
          effortMode==="force" ? "N over a "+fx(STROKE*100,0)+" cm push · "+fx(vLo,2)+"–"+fx(vHi,2)+" m/s"
                               : (lo>0?"+":"")+fx(lo,1)+"% to "+(hi>0?"+":"")+fx(hi,1)+"% · "+fx(vLo,2)+"–"+fx(vHi,2)+" m/s", "or");
     push("Force margin", "±"+fx((hi-lo)/2,1)+"%",
@@ -2430,7 +2495,7 @@ function drawVerdict(){
 })();
 
 /* ---------------- view switching ---------------- */
-let activeView = "analysis";
+let activeView = "sim3d";
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click", ()=>{
   activeView = b.dataset.view;
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("is-on", t===b));
@@ -2500,8 +2565,11 @@ document.getElementById("decide").addEventListener("change", e=>{
   scheduleSensitivity();
 });
 
+document.getElementById("view-analysis").hidden = true;
+document.getElementById("view-sim3d").hidden = false;
 recompute();
 camApply("corner");
+drawStatic();
 scheduleSensitivity();
 requestAnimationFrame(frame);
 </script>

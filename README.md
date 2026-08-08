@@ -170,8 +170,13 @@ little above `θ*`, which lands entry angles in the 40–48° band that coaching
 
 ## 3D flight & bounce
 
-The second tab replaces the analytic swish test with a full rigid-body simulation, integrated at
-600 Hz. It answers the question the geometry cannot: *if it doesn't go straight in, what happens
+The default tab. It replaces the analytic swish test with a full rigid-body simulation, integrated
+at 600 Hz.
+
+**Three gauges do the work.** Under the scene sit the only controls most sessions need — **Force**,
+**Direction (left/right)** and **Angle** — each with the viable-range shading painted straight onto
+its track, so you can see where the shot still scores while you drag. They are two-way bound to the
+sidebar, which keeps the full parameter set for when you want it. It answers the question the geometry cannot: *if it doesn't go straight in, what happens
 next?*
 
 **Contact model.** The rim is a torus — ring centreline at `R + t`, tube radius `t = ⅝″/2` — so
