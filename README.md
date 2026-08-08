@@ -5,6 +5,10 @@ basketball more room for error** — and what that arc costs you in force precis
 
 Open `index.html` in any modern browser. No build step, no dependencies, no network access.
 
+> **iOS app:** native tracking and simulation now live in a separate repo —
+> [pjdv/basketball-arc-ios](https://github.com/pjdv/basketball-arc-ios). This repo remains the web
+> version; the two are developed independently from here on.
+
 ```bash
 open index.html
 ```
