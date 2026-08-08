@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Basketball Arc Simulator — Room for Error vs. Launch Angle</title>
+<style>
+  :root{
+    --bg:#0a0e14;
+    --panel:#121924;
+    --panel-2:#0e141d;
+    --line:#243043;
+    --line-soft:#1a2430;
+    --txt:#e6edf6;
+    --txt-dim:#8b9bb0;
+    --txt-faint:#5d6c80;
+    --accent:#ff8a3d;
+    --accent-2:#4cc9f0;
+    --good:#3ddc97;
+    --warn:#ffc857;
+    --bad:#ff5d5d;
+    --shadow:0 1px 0 rgba(255,255,255,.03), 0 8px 24px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #16202e 0%, transparent 60%),
+      radial-gradient(900px 500px at 95% 0%, #1a1622 0%, transparent 55%),
+      var(--bg);
+    color:var(--txt);
+    font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  header{
+    padding:22px 24px 16px;
+    border-bottom:1px solid var(--line-soft);
+    display:flex;flex-wrap:wrap;align-items:baseline;gap:14px;
+  }
+  header h1{font-size:19px;margin:0;letter-spacing:-.2px;font-weight:650}
+  header h1 span{color:var(--accent)}
+  header p{margin:0;color:var(--txt-dim);font-size:13px;max-width:70ch}
+  .wrap{padding:18px 24px 60px;max-width:1680px;margin:0 auto}
+  .layout{display:grid;grid-template-columns:296px minmax(0,1fr);gap:18px;align-items:start}
+  @media (max-width:1040px){.layout{grid-template-columns:1fr}}
+
+  .panel{
+    background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);
+    border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+  }
+  .panel > h2{
+    margin:0;padding:11px 14px;font-size:12px;font-weight:650;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--txt-dim);border-bottom:1px solid var(--line-soft);
+    display:flex;justify-content:space-between;align-items:center;gap:8px;
+  }
+  .panel > h2 em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:450;color:var(--txt-faint);font-size:11px}
+  .panel .body{padding:12px 14px}
+
+  /* controls */
+  aside{position:sticky;top:14px}
+  @media (max-width:1040px){aside{position:static}}
+  .grp{padding:10px 14px 4px;border-bottom:1px solid var(--line-soft)}
+  .grp:last-of-type{border-bottom:0}
+  .grp h3{margin:2px 0 10px;font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:var(--accent);font-weight:650;opacity:.85}
+  .ctl{margin-bottom:12px}
+  .ctl .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:5px}
+  .ctl label{color:var(--txt-dim);font-size:12px}
+  .ctl output{font-variant-numeric:tabular-nums;font-size:12px;color:var(--txt);font-weight:600}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:18px;background:transparent;cursor:pointer;margin:0;
+  }
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:3px;background:var(--line)}
+  input[type=range]::-moz-range-track{height:4px;border-radius:3px;background:var(--line)}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);
+    margin-top:-5px;border:2px solid #0a0e14;box-shadow:0 0 0 1px var(--accent);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid #0a0e14;box-shadow:0 0 0 1px var(--accent);
+  }
+  input[type=range]:focus-visible{outline:2px solid var(--accent-2);outline-offset:4px;border-radius:4px}
+  .btns{display:flex;gap:8px;padding:12px 14px}
+  button{
+    flex:1;background:#1b2534;color:var(--txt);border:1px solid var(--line);border-radius:8px;
+    padding:8px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s;
+  }
+  button:hover{background:#243247;border-color:#33445d}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#1a0f05}
+  button.primary:hover{background:#ffa060;border-color:#ffa060}
+  button:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+
+  /* canvases */
+  .stack{display:flex;flex-direction:column;gap:18px;min-width:0}
+  canvas{display:block;width:100%}
+  #side{aspect-ratio:16/7.4}
+  @media (max-width:700px){#side{aspect-ratio:4/3}}
+  #rim{aspect-ratio:1/1}
+  #chart{aspect-ratio:4/3}
+  #court{aspect-ratio:1/1.12}
+  .trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+  @media (max-width:1180px){.trio{grid-template-columns:1fr 1fr}}
+  @media (max-width:700px){.trio{grid-template-columns:1fr}}
+  #court{cursor:crosshair}
+
+  /* metrics */
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:1px;background:var(--line-soft);border-radius:0 0 12px 12px;overflow:hidden}
+  .m{background:var(--panel-2);padding:11px 13px}
+  .m .k{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--txt-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .m .v{font-size:19px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:3px;letter-spacing:-.4px}
+  .m .s{font-size:11px;color:var(--txt-faint);font-variant-numeric:tabular-nums}
+  .v.good{color:var(--good)} .v.warn{color:var(--warn)} .v.bad{color:var(--bad)} .v.cy{color:var(--accent-2)} .v.or{color:var(--accent)}
+
+  .alert{margin:0;padding:10px 14px;background:rgba(255,93,93,.12);border-bottom:1px solid rgba(255,93,93,.3);color:#ffb0b0;font-size:12.5px}
+  .alert[hidden]{display:none}
+
+  /* explainer */
+  .explain{padding:16px 18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+  .explain h4{margin:0 0 6px;font-size:13px;color:var(--accent-2);font-weight:650}
+  .explain p{margin:0 0 9px;color:var(--txt-dim);font-size:13px}
+  .explain strong{color:var(--txt);font-weight:600}
+  .eq{
+    display:block;background:#0a0f16;border:1px solid var(--line);border-left:2px solid var(--accent);
+    border-radius:6px;padding:9px 11px;margin:9px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:12px;color:#cfe0f2;overflow-x:auto;white-space:pre;
+  }
+  .eq b{color:var(--accent);font-weight:600}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;padding:8px 14px 12px;font-size:11.5px;color:var(--txt-dim)}
+  .legend i{display:inline-block;width:16px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+  .note{padding:0 18px 16px;color:var(--txt-faint);font-size:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Basketball <span>Arc</span> Simulator</h1>
+  <p>How launch angle changes the size of the target the ball actually sees — and what it costs in force precision.</p>
+</header>
+
+<div class="wrap">
+  <div class="layout">
+
+    <aside>
+      <div class="panel">
+        <h2>Parameters</h2>
+        <div id="controls"></div>
+        <div class="btns">
+          <button id="replay" class="primary">Replay shot</button>
+          <button id="pause">Pause</button>
+          <button id="reset">Reset</button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="stack">
+
+      <section class="panel">
+        <h2>Side view — trajectory &amp; cone of acceptance <em>shaded band = every launch angle that still swishes at this speed</em></h2>
+        <p class="alert" id="alert" hidden></p>
+        <canvas id="side"></canvas>
+        <div class="legend">
+          <span><i style="background:#ff8a3d"></i>Selected trajectory</span>
+          <span><i style="background:rgba(76,201,240,.55)"></i>Cone of acceptance</span>
+          <span><i style="background:#3ddc97"></i>Swish window at rim</span>
+          <span><i style="background:#5d6c80"></i>Apex</span>
+        </div>
+      </section>
+
+      <div class="trio">
+        <section class="panel">
+          <h2>Ball's-eye view <em>rim seen along the flight path</em></h2>
+          <canvas id="rim"></canvas>
+        </section>
+        <section class="panel">
+          <h2>Room for error vs. launch angle</h2>
+          <canvas id="chart"></canvas>
+        </section>
+        <section class="panel">
+          <h2>Court <em>click or drag to move</em></h2>
+          <canvas id="court"></canvas>
+        </section>
+      </div>
+
+      <section class="panel">
+        <h2>Key metrics</h2>
+        <div class="metrics" id="metrics"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Why arc buys you room</h2>
+        <div class="explain" id="explain"></div>
+        <p class="note" id="assump"></p>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ *
+ * Constants & small helpers
+ * ------------------------------------------------------------------ */
+const G   = 9.8;          // m/s^2, per spec
+const IN  = 0.0254;       // m per inch
+const D2R = Math.PI/180, R2D = 180/Math.PI;
+
+const clamp = (v,a,b)=>v<a?a:v>b?b:v;
+const fx = (v,d)=>(Number.isFinite(v)?v.toFixed(d):"—");
+function ftin(m){
+  const t = m/0.3048, f = Math.floor(t);
+  let i = Math.round((t-f)*12);
+  return i===12 ? (f+1)+"'0\"" : f+"'"+i+'"';
+}
+
+/* ------------------------------------------------------------------ *
+ * Physics
+ * ------------------------------------------------------------------ */
+
+// Speed needed to send the ball through the rim centre at launch angle `th`.
+// From  dy = L*tan(th) - g*L^2 / (2 v^2 cos^2 th).  Null when unreachable.
+function requiredV(th, L, dy){
+  const c = Math.cos(th);
+  const den = 2*c*c*(L*Math.tan(th) - dy);
+  if(!(den > 0)) return null;
+  const v2 = G*L*L/den;
+  return (Number.isFinite(v2) && v2>0) ? Math.sqrt(v2) : null;
+}
+
+// Where the ball crosses the rim plane on the way DOWN.
+function crossing(v, th, h0, H){
+  const s = Math.sin(th), c = Math.cos(th);
+  if(c <= 1e-6 || v <= 0) return null;
+  const disc = v*v*s*s - 2*G*(H-h0);
+  if(disc < 0) return null;                       // never reaches rim height
+  const t = (v*s + Math.sqrt(disc))/G;
+  if(t <= 0) return null;
+  return {t, x: v*c*t, vx: v*c, vy: v*s - G*t};
+}
+
+const entryOf = cr => Math.atan2(-cr.vy, cr.vx);   // radians below horizontal
+
+// Depth of the swish window for the ball's CENTRE at the rim plane:
+//   W = D_rim - d_ball / sin(entry)
+function windowFor(entry, Drim, dball){
+  const se = Math.sin(entry);
+  if(se <= 1e-6) return -1;
+  return Drim - dball/se;
+}
+
+// Does this (v, th) swish? Each perturbed shot is judged by its own entry angle.
+function swishes(v, th, p){
+  const cr = crossing(v, th, p.h0, p.H);
+  if(!cr) return false;
+  const e = entryOf(cr);
+  if(e <= 0) return false;
+  const W = windowFor(e, p.Drim, p.dball);
+  if(W <= 0) return false;
+  return Math.abs(cr.x - p.L) <= W/2;
+}
+
+// Angular tolerance: hold speed, sweep the launch angle outward (dir = +1/-1).
+// Coarse scan first — range is non-monotonic in angle — then bisect the bracket.
+const TOL_MAX = 30*D2R, TOL_STEP = 0.25*D2R;
+function angleTol(v, th0, p, dir){
+  if(!swishes(v, th0, p)) return 0;
+  let lo = 0, hi = -1;
+  for(let d = TOL_STEP; d <= TOL_MAX; d += TOL_STEP){
+    const th = th0 + dir*d;
+    if(th <= 1*D2R || th >= 89*D2R){ hi = d; break; }
+    if(!swishes(v, th, p)){ hi = d; break; }
+    lo = d;
+  }
+  if(hi < 0) return TOL_MAX;                       // never breaks within the search
+  for(let i=0;i<36;i++){
+    const m = (lo+hi)/2;
+    if(swishes(v, th0 + dir*m, p)) lo = m; else hi = m;
+  }
+  return lo;
+}
+
+// Velocity tolerance: range is strictly monotonic in speed, so bisect directly.
+function velTol(v0, th, p, dir){
+  if(!swishes(v0, th, p)) return 0;
+  let lo = 0, hi = 0.5*v0;
+  if(swishes(v0 + dir*hi, th, p)) return hi;
+  for(let i=0;i<40;i++){
+    const m = (lo+hi)/2;
+    if(swishes(v0 + dir*m, th, p)) lo = m; else hi = m;
+  }
+  return lo;
+}
+
+// Smallest launch angle producing at least `targetEntry` at the rim.
+// Entry angle rises monotonically with launch angle, so the first hit is the answer.
+function launchForEntry(targetEntry, p){
+  for(let a=15; a<=88; a+=0.1){
+    const th = a*D2R, v = requiredV(th, p.L, p.dy);
+    if(v === null || v > 40) continue;
+    const cr = crossing(v, th, p.h0, p.H);
+    if(cr && entryOf(cr) >= targetEntry) return th;
+  }
+  return null;
+}
+
+// The other launch angle that reaches the rim with the SAME speed
+// (k·u² − L·u + (dy + k) = 0 with u = tan θ, k = gL²/2v²).
+function companionAngle(v, th0, L, dy){
+  const k = G*L*L/(2*v*v);
+  const disc = L*L - 4*k*(dy + k);
+  if(disc < 0) return null;
+  const r = Math.sqrt(disc);
+  const cands = [(L + r)/(2*k), (L - r)/(2*k)].map(Math.atan).filter(a => a > 0 && a < 89*D2R);
+  let best = null, bd = 0;
+  for(const a of cands){ const d = Math.abs(a - th0); if(d > bd){ bd = d; best = a; } }
+  return (bd > 0.5*D2R) ? best : null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Controls
+ * ------------------------------------------------------------------ */
+const CONTROLS = [
+  {group:"Shooter", items:[
+    {id:"playerH", label:"Player height",      min:150, max:220, step:1,    val:190,  fmt:v=>fx(v,0)+" cm · "+ftin(v/100)},
+    {id:"rel",     label:"Release above head", min:10,  max:40,  step:1,    val:25,   fmt:v=>fx(v,0)+" cm"},
+    {id:"dist",    label:"Distance to basket", min:1,   max:10,  step:0.05, val:5,    fmt:v=>fx(v,2)+" m · "+fx(v/0.3048,1)+" ft"},
+    {id:"off",     label:"Lateral offset",     min:-7,  max:7,   step:0.05, val:0,    fmt:v=>(Math.abs(v)<0.005?"centre":fx(Math.abs(v),2)+" m "+(v<0?"left":"right"))}
+  ]},
+  {group:"Shot", items:[
+    {id:"angle",   label:"Launch angle",       min:20,  max:80,  step:0.5,  val:52,   fmt:v=>fx(v,1)+"°"},
+    {id:"speed",   label:"Animation speed",    min:0.1, max:3,   step:0.1,  val:1,    fmt:v=>fx(v,1)+"×"}
+  ]},
+  {group:"Court & equipment", items:[
+    {id:"rimH",    label:"Rim height",         min:2,   max:3.5, step:0.01, val:3.05, fmt:v=>fx(v,2)+" m · "+ftin(v)},
+    {id:"rimD",    label:"Rim diameter",       min:14,  max:24,  step:0.1,  val:18,   fmt:v=>fx(v,1)+" in · "+fx(v*IN*100,1)+" cm"},
+    {id:"ballD",   label:"Ball diameter",      min:6,   max:12,  step:0.1,  val:9.4,  fmt:v=>fx(v,1)+" in · "+fx(v*IN*100,1)+" cm"}
+  ]}
+];
+const ITEMS = CONTROLS.flatMap(g=>g.items);
+const DEFAULTS = Object.fromEntries(ITEMS.map(i=>[i.id, i.val]));
+const inputs = {}, outputs = {};
+
+(function buildControls(){
+  const host = document.getElementById("controls");
+  for(const g of CONTROLS){
+    const d = document.createElement("div");
+    d.className = "grp";
+    d.innerHTML = "<h3>"+g.group+"</h3>";
+    for(const it of g.items){
+      const c = document.createElement("div");
+      c.className = "ctl";
+      c.innerHTML =
+        '<div class="row"><label for="'+it.id+'">'+it.label+'</label><output id="out-'+it.id+'"></output></div>'+
+        '<input type="range" id="'+it.id+'" min="'+it.min+'" max="'+it.max+'" step="'+it.step+'" value="'+it.val+'">';
+      d.appendChild(c);
+    }
+    host.appendChild(d);
+  }
+  for(const it of ITEMS){
+    inputs[it.id]  = document.getElementById(it.id);
+    outputs[it.id] = document.getElementById("out-"+it.id);
+    inputs[it.id].addEventListener("input", ()=>{ if(it.id!=="speed") restart(); recompute(); });
+  }
+})();
+
+function setVal(id, v){ inputs[id].value = v; }
+function readInputs(){
+  const s = {};
+  for(const it of ITEMS) s[it.id] = parseFloat(inputs[it.id].value);
+  // A lateral offset can never exceed the straight-line distance to the hoop.
+  if(Math.abs(s.off) > s.dist){ s.off = Math.sign(s.off)*s.dist; setVal("off", s.off.toFixed(2)); }
+  for(const it of ITEMS) outputs[it.id].textContent = it.fmt(s[it.id]);
+  return s;
+}
+
+/* ------------------------------------------------------------------ *
+ * Model
+ * ------------------------------------------------------------------ */
+let model = null, anim = {t:0, playing:true};
+
+function recompute(){
+  const s = readInputs();
+  const p = {
+    L: s.dist,
+    h0: s.playerH/100 + s.rel/100,
+    H: s.rimH,
+    Drim: s.rimD*IN,
+    dball: s.ballD*IN,
+    th: s.angle*D2R
+  };
+  p.dy = p.H - p.h0;
+  p.R = p.Drim/2; p.r = p.dball/2;
+
+  const m = {s, p, ok:false, reason:""};
+  m.minEntry = (p.dball < p.Drim) ? Math.asin(p.dball/p.Drim) : null;
+  m.thOpt = Math.PI/4 + 0.5*Math.atan2(p.dy, p.L);
+  m.launch45 = launchForEntry(45*D2R, p);
+  m.launchOpen = m.minEntry !== null ? launchForEntry(m.minEntry, p) : null;
+
+  const v = requiredV(p.th, p.L, p.dy);
+  if(v === null){
+    m.reason = "At "+fx(s.angle,1)+"° the ball can't reach the rim from this release point — the "+
+               "launch angle must exceed the straight line to the hoop ("+fx(Math.atan2(p.dy,p.L)*R2D,1)+"°). Raise the angle.";
+  }else if(v > 40){
+    m.reason = "Required speed exceeds 40 m/s — physically unrealistic. Adjust the angle or distance.";
+  }else{
+    const cr = crossing(v, p.th, p.h0, p.H);
+    if(!cr){ m.reason = "No descending crossing of the rim plane."; }
+    else{
+      m.ok = true;
+      m.v = v; m.cr = cr;
+      m.entry = entryOf(cr);
+      m.tFlight = cr.t;
+      m.apex = p.h0 + (v*Math.sin(p.th))**2/(2*G);
+      m.apexT = v*Math.sin(p.th)/G;
+      m.effOpen = p.Drim*Math.sin(m.entry);            // foreshortened depth of the rim
+      m.win = windowFor(m.entry, p.Drim, p.dball);     // depth window for the ball's centre
+      m.winLat = p.Drim - p.dball;                     // lateral window — arc-independent
+      m.tolUp = angleTol(v, p.th, p, +1);
+      m.tolDn = angleTol(v, p.th, p, -1);
+      m.tolAng = Math.min(m.tolUp, m.tolDn);
+      m.vUp = velTol(v, p.th, p, +1);
+      m.vDn = velTol(v, p.th, p, -1);
+      m.tolVel = Math.min(m.vUp, m.vDn);
+      m.companion = companionAngle(v, p.th, p.L, p.dy);
+      m.pathT = cr.t*1.28;                             // carry the ball a little past the rim
+    }
+  }
+  model = m;
+  m.curve = buildCurve(m);
+
+  const al = document.getElementById("alert");
+  al.hidden = m.ok; al.textContent = m.reason;
+
+  drawStatic();
+  return m;
+}
+
+// Error-margin curves across the whole launch-angle range.
+function buildCurve(m){
+  const p = m.p, out = [];
+  for(let a = 20; a <= 80.0001; a += 0.5){
+    const th = a*D2R;
+    const v = requiredV(th, p.L, p.dy);
+    const pt = {a, ang:null, vel:null, win:null, entry:null};
+    if(v !== null && v <= 40){
+      const cr = crossing(v, th, p.h0, p.H);
+      if(cr){
+        const e = entryOf(cr), W = windowFor(e, p.Drim, p.dball);
+        pt.entry = e;
+        pt.win = Math.max(0, W);
+        if(W > 0){
+          pt.ang = Math.min(angleTol(v,th,p,+1), angleTol(v,th,p,-1))*R2D;
+          pt.vel = Math.min(velTol(v,th,p,+1), velTol(v,th,p,-1))/v*100;
+        }else{ pt.ang = 0; pt.vel = 0; }
+      }
+    }
+    out.push(pt);
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ *
+ * Canvas plumbing
+ * ------------------------------------------------------------------ */
+function fit(c){
+  const r = c.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+  if(c.width !== w*dpr || c.height !== h*dpr){ c.width = w*dpr; c.height = h*dpr; }
+  const ctx = c.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  return {ctx, w, h};
+}
+function label(ctx, txt, x, y, {color="#8b9bb0", size=11, align="left", base="alphabetic", weight=""}={}){
+  ctx.fillStyle = color;
+  ctx.font = (weight?weight+" ":"")+size+'px ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif';
+  ctx.textAlign = align; ctx.textBaseline = base;
+  ctx.fillText(txt, x, y);
+}
+function dash(ctx, arr, fn){ ctx.save(); ctx.setLineDash(arr); fn(); ctx.restore(); }
+
+/* ------------------------------------------------------------------ *
+ * 1. Side view
+ * ------------------------------------------------------------------ */
+function drawSide(){
+  const {ctx, w, h} = fit(document.getElementById("side"));
+  const m = model, p = m.p;
+
+  const xMin = -0.7, xMax = p.L + 1.4;
+  const yMax = Math.max(m.ok ? m.apex : 0, p.H + 1.0, p.h0 + 0.3) + 0.35;
+  const ml=16, mr=16, mt=14, mb=26;
+  const s = Math.min((w-ml-mr)/(xMax-xMin), (h-mt-mb)/yMax);
+  const ox = ml + ((w-ml-mr) - (xMax-xMin)*s)/2 - xMin*s;
+  const oy = h - mb - ((h-mt-mb) - yMax*s)/2;
+  const X = x => ox + x*s, Y = y => oy - y*s;
+
+  // floor + height gridlines
+  ctx.strokeStyle = "#1a2430"; ctx.lineWidth = 1;
+  dash(ctx,[3,5],()=>{
+    for(let gy=1; gy<yMax; gy++){
+      ctx.beginPath(); ctx.moveTo(X(xMin), Y(gy)); ctx.lineTo(X(xMax), Y(gy)); ctx.stroke();
+      label(ctx, gy+" m", X(xMin)+3, Y(gy)-3, {color:"#33415a", size:9.5});
+    }
+  });
+  ctx.strokeStyle = "#3a4a63"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(X(xMin), Y(0)); ctx.lineTo(X(xMax), Y(0)); ctx.stroke();
+
+  // ---- player -------------------------------------------------------
+  const ph = p.h0 - m.s.rel/100;
+  ctx.strokeStyle = "#4a5c78"; ctx.lineWidth = 2; ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(0), Y(ph*0.52));            // legs
+  ctx.moveTo(X(-0.16), Y(0)); ctx.lineTo(X(0), Y(ph*0.52));
+  ctx.moveTo(X(0), Y(ph*0.52)); ctx.lineTo(X(0), Y(ph-0.22));      // torso
+  ctx.moveTo(X(0), Y(ph-0.28)); ctx.lineTo(X(0), Y(p.h0));         // arms up to release
+  ctx.stroke();
+  ctx.beginPath(); ctx.arc(X(0), Y(ph-0.11), 0.11*s, 0, 7); ctx.stroke();
+  ctx.lineCap = "butt";
+
+  // release marker
+  dash(ctx,[2,4],()=>{
+    ctx.strokeStyle = "#33415a";
+    ctx.beginPath(); ctx.moveTo(X(0), Y(p.h0)); ctx.lineTo(X(p.L), Y(p.h0)); ctx.stroke();
+  });
+  label(ctx, "release "+fx(p.h0,2)+" m", X(0)+8, Y(p.h0)-7, {color:"#5d6c80", size:10});
+
+  // ---- hoop ---------------------------------------------------------
+  const bbX = p.L + 0.375;
+  ctx.strokeStyle = "#2e3d54"; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(X(bbX), Y(p.H-0.15)); ctx.lineTo(X(bbX), Y(p.H+0.90)); ctx.stroke();
+  ctx.lineWidth = 3; ctx.strokeStyle = "#243043";
+  ctx.beginPath(); ctx.moveTo(X(bbX), Y(p.H+0.90)); ctx.lineTo(X(bbX+0.5), Y(p.H+0.90));
+  ctx.lineTo(X(bbX+0.5), Y(0)); ctx.stroke();
+  // net
+  ctx.strokeStyle = "#3a4a63"; ctx.lineWidth = 1;
+  for(let i=0;i<=6;i++){
+    const t = i/6, x0 = p.L - p.R + t*p.Drim, x1 = p.L - p.R*0.45 + t*p.R*0.9;
+    ctx.beginPath(); ctx.moveTo(X(x0), Y(p.H)); ctx.lineTo(X(x1), Y(p.H-0.42)); ctx.stroke();
+  }
+  ctx.strokeStyle = "#e0503a"; ctx.lineWidth = 4; ctx.lineCap="round";
+  ctx.beginPath(); ctx.moveTo(X(p.L-p.R), Y(p.H)); ctx.lineTo(X(p.L+p.R), Y(p.H)); ctx.stroke();
+  ctx.lineCap="butt";
+
+  if(!m.ok){ label(ctx, "no valid trajectory", X((xMin+xMax)/2), Y(yMax*0.55), {color:"#ff5d5d", size:13, align:"center", weight:"600"}); return; }
+
+  // ---- cone of acceptance ------------------------------------------
+  const pathFor = (th, v, t0, t1) => {
+    const pts = [];
+    for(let i=0;i<=160;i++){
+      const t = t0 + (t1-t0)*i/160;
+      pts.push([v*Math.cos(th)*t, p.h0 + v*Math.sin(th)*t - 0.5*G*t*t]);
+    }
+    return pts;
+  };
+  const hiTh = p.th + m.tolUp, loTh = p.th - m.tolDn;
+  const crHi = crossing(m.v, hiTh, p.h0, p.H), crLo = crossing(m.v, loTh, p.h0, p.H);
+  if(crHi && crLo && (m.tolUp+m.tolDn) > 1e-4){
+    const A = pathFor(hiTh, m.v, 0, crHi.t), B = pathFor(loTh, m.v, 0, crLo.t);
+    ctx.beginPath();
+    ctx.moveTo(X(A[0][0]), Y(A[0][1]));
+    for(const q of A) ctx.lineTo(X(q[0]), Y(q[1]));
+    for(let i=B.length-1;i>=0;i--) ctx.lineTo(X(B[i][0]), Y(B[i][1]));
+    ctx.closePath();
+    ctx.fillStyle = "rgba(76,201,240,.16)"; ctx.fill();
+    ctx.strokeStyle = "rgba(76,201,240,.45)"; ctx.lineWidth = 1;
+    dash(ctx,[4,4],()=>ctx.stroke());
+  }
+
+  // ---- nominal trajectory (solid to the rim, faint through the net) --
+  const stroke = (arr)=>{ ctx.beginPath(); arr.forEach((q,i)=> i ? ctx.lineTo(X(q[0]), Y(q[1])) : ctx.moveTo(X(q[0]), Y(q[1]))); ctx.stroke(); };
+  ctx.strokeStyle = "#ff8a3d"; ctx.lineWidth = 2;
+  stroke(pathFor(p.th, m.v, 0, m.cr.t));
+  ctx.strokeStyle = "rgba(255,138,61,.28)"; ctx.lineWidth = 1.5;
+  dash(ctx,[3,4],()=> stroke(pathFor(p.th, m.v, m.cr.t, m.pathT)));
+
+  // apex
+  const ax = m.v*Math.cos(p.th)*m.apexT;
+  dash(ctx,[3,4],()=>{
+    ctx.strokeStyle="#5d6c80"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(X(ax), Y(m.apex)); ctx.lineTo(X(ax), Y(0)); ctx.stroke();
+  });
+  ctx.fillStyle="#8b9bb0"; ctx.beginPath(); ctx.arc(X(ax), Y(m.apex), 3, 0, 7); ctx.fill();
+  label(ctx, "apex "+fx(m.apex,2)+" m", X(ax), Y(m.apex)-8, {color:"#8b9bb0", size:10.5, align:"center"});
+
+  // ---- swish window at the rim --------------------------------------
+  const belowNet = Y(p.H) + 0.42*s + 15;                  // clear of the net strands
+  if(m.win > 0){
+    ctx.strokeStyle = "#3ddc97"; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(X(p.L-m.win/2), Y(p.H)); ctx.lineTo(X(p.L+m.win/2), Y(p.H)); ctx.stroke();
+    ctx.lineWidth = 1.5;
+    for(const xx of [p.L-m.win/2, p.L+m.win/2]){
+      ctx.beginPath(); ctx.moveTo(X(xx), Y(p.H)-9); ctx.lineTo(X(xx), Y(p.H)+9); ctx.stroke();
+    }
+    label(ctx, "swish window "+fx(m.win*100,1)+" cm", X(p.L), belowNet, {color:"#3ddc97", size:10.5, align:"center", weight:"600"});
+  }else{
+    label(ctx, "window closed — cannot swish", X(p.L), belowNet, {color:"#ff5d5d", size:10.5, align:"center", weight:"600"});
+  }
+
+  // entry-angle arc at the rim
+  ctx.strokeStyle = "rgba(255,138,61,.6)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(X(p.L), Y(p.H), 34, -m.entry, 0); ctx.stroke();
+  label(ctx, fx(m.entry*R2D,1)+"° entry", X(p.L)+38, Y(p.H)-14, {color:"#ffb27a", size:10.5, weight:"600"});
+
+  // ---- animated ball ------------------------------------------------
+  const t = anim.t;
+  const bx = m.v*Math.cos(p.th)*t, by = p.h0 + m.v*Math.sin(p.th)*t - 0.5*G*t*t;
+  const br = Math.max(3, p.r*s);
+  const grd = ctx.createRadialGradient(X(bx)-br*0.35, Y(by)-br*0.35, br*0.15, X(bx), Y(by), br);
+  grd.addColorStop(0, "#ffb06a"); grd.addColorStop(1, "#d9622a");
+  ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(X(bx), Y(by), br, 0, 7); ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,.45)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(X(bx), Y(by), br, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(X(bx)-br, Y(by)); ctx.lineTo(X(bx)+br, Y(by)); ctx.stroke();
+
+  // distance annotation
+  dash(ctx,[2,4],()=>{
+    ctx.strokeStyle="#33415a"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(X(0), Y(0)+12); ctx.lineTo(X(p.L), Y(0)+12); ctx.stroke();
+  });
+  label(ctx, fx(p.L,2)+" m to hoop", X(p.L/2), Y(0)+22, {color:"#5d6c80", size:10, align:"center"});
+}
+
+/* ------------------------------------------------------------------ *
+ * 2. Ball's-eye view
+ * ------------------------------------------------------------------ */
+function drawRimView(){
+  const {ctx, w, h} = fit(document.getElementById("rim"));
+  const m = model, p = m.p;
+  const cx = w/2, cy = h/2 + 6;
+  const R = Math.min(w, h)*0.33;
+  const sc = R/p.R;                                  // px per metre
+  const rb = p.r*sc;
+  const e = m.ok ? m.entry : p.th;
+  const sinE = Math.max(Math.sin(e), 0.02);
+  const ry = R*sinE;
+  const open = m.ok ? (m.win > 0) : false;
+
+  // rim if the ball fell straight down
+  dash(ctx,[4,4],()=>{
+    ctx.strokeStyle = "#33415a"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
+  });
+  label(ctx, "rim at 90° entry", cx, cy - R - 10, {color:"#5d6c80", size:10, align:"center"});
+
+  // the opening the ball actually sees
+  ctx.beginPath(); ctx.ellipse(cx, cy, R, ry, 0, 0, 7);
+  ctx.fillStyle = open ? "rgba(61,220,151,.16)" : "rgba(255,93,93,.16)";
+  ctx.fill();
+  ctx.strokeStyle = open ? "#3ddc97" : "#ff5d5d"; ctx.lineWidth = 2; ctx.stroke();
+
+  // ball cross-section
+  ctx.beginPath(); ctx.arc(cx, cy, rb, 0, 7);
+  ctx.fillStyle = "rgba(255,138,61,.85)"; ctx.fill();
+  ctx.strokeStyle = "#8a3f14"; ctx.lineWidth = 1; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx-rb, cy); ctx.lineTo(cx+rb, cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx, cy-rb); ctx.lineTo(cx, cy+rb); ctx.stroke();
+
+  // depth clearance (top gap)
+  const gapY = ry - rb, gapX = R - rb;
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = gapY > 0 ? "#3ddc97" : "#ff5d5d";
+  ctx.beginPath(); ctx.moveTo(cx, cy-rb); ctx.lineTo(cx, cy-ry); ctx.stroke();
+  ctx.strokeStyle = "#4cc9f0";
+  ctx.beginPath(); ctx.moveTo(cx+rb, cy); ctx.lineTo(cx+R, cy); ctx.stroke();
+
+  const depthTxt = (gapY/sc*100);
+  label(ctx, (depthTxt>=0?"+":"")+fx(depthTxt,1)+" cm", cx+6, cy-(rb+ry)/2,
+        {color: gapY>0?"#3ddc97":"#ff5d5d", size:11, weight:"600", base:"middle"});
+  label(ctx, fx(gapX/sc*100,1)+" cm", (cx+rb+cx+R)/2, cy-8, {color:"#4cc9f0", size:11, align:"center", weight:"600"});
+
+  // axis captions
+  label(ctx, "depth — short / long error", cx, cy + Math.max(ry, rb) + 20, {color:"#8b9bb0", size:10.5, align:"center"});
+  label(ctx, "◀ lateral — left / right error ▶", cx, h-38, {color:"#8b9bb0", size:10.5, align:"center"});
+
+  // the maths, spelled out
+  label(ctx, "effective depth = D·sin θₑ = "+fx(p.Drim/IN,1)+"″ × sin "+fx(e*R2D,1)+"° = "+fx(m.ok?m.effOpen/IN:0,2)+"″",
+        12, 18, {color:"#cfe0f2", size:11, weight:"600"});
+  label(ctx, "ball needs "+fx(p.dball/IN,1)+"″  →  "+(open ? "fits, "+fx(m.win/IN,2)+"″ of play" : "does not fit"),
+        12, 34, {color: open ? "#3ddc97" : "#ff5d5d", size:11});
+
+  // the two clearances measure different things — say so explicitly
+  if(m.ok && open){
+    label(ctx, "green = clearance ⊥ to flight ("+fx(depthTxt,1)+" cm) → "+fx(m.win*100,1)+" cm of fore/aft landing room",
+          cx, h-20, {color:"#5d6c80", size:10, align:"center"});
+    label(ctx, "blue = lateral clearance, fixed at (D−d)/2 whatever the arc",
+          cx, h-7, {color:"#5d6c80", size:10, align:"center"});
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * 3. Error-margin chart
+ * ------------------------------------------------------------------ */
+function drawChart(){
+  const {ctx, w, h} = fit(document.getElementById("chart"));
+  const m = model, cur = m.curve;
+  const L = 40, Rm = 42, T = 26, B = 66;
+  const pw = w-L-Rm, phh = h-T-B;
+
+  const maxLeft = Math.max(2, ...cur.map(d=>Math.max(d.ang||0, d.vel||0))) * 1.12;
+  const maxRight = Math.max(2, ...cur.map(d=>(d.win||0)*100)) * 1.12;
+  const X = a => L + (a-20)/60*pw;
+  const YL = v => T + phh - clamp(v/maxLeft,0,1)*phh;
+  const YR = v => T + phh - clamp(v/maxRight,0,1)*phh;
+
+  // grid
+  ctx.strokeStyle = "#1a2430"; ctx.lineWidth = 1;
+  for(let i=0;i<=4;i++){
+    const y = T + phh*i/4;
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(L+pw,y); ctx.stroke();
+    label(ctx, fx(maxLeft*(1-i/4),1), L-6, y, {color:"#4a5a70", size:9.5, align:"right", base:"middle"});
+    label(ctx, fx(maxRight*(1-i/4),0), L+pw+6, y, {color:"#4a5a70", size:9.5, base:"middle"});
+  }
+  for(let a=20;a<=80;a+=10){
+    ctx.strokeStyle = "#1a2430";
+    ctx.beginPath(); ctx.moveTo(X(a),T); ctx.lineTo(X(a),T+phh); ctx.stroke();
+    label(ctx, a+"°", X(a), T+phh+14, {color:"#4a5a70", size:10, align:"center"});
+  }
+  label(ctx, "launch angle", L+pw/2, T+phh+30, {color:"#5d6c80", size:10.5, align:"center"});
+  label(ctx, "° / %", L-6, T-8, {color:"#5d6c80", size:10, align:"right"});
+  label(ctx, "cm", L+pw+6, T-8, {color:"#5d6c80", size:10});
+
+  const series = (key, yfn, color, wid, scale) => {
+    ctx.strokeStyle = color; ctx.lineWidth = wid; ctx.beginPath();
+    let started = false;
+    for(const d of cur){
+      const val = d[key];
+      if(val === null || val === undefined){ started = false; continue; }
+      const px = X(d.a), py = yfn(val*scale);
+      started ? ctx.lineTo(px,py) : ctx.moveTo(px,py);
+      started = true;
+    }
+    ctx.stroke();
+  };
+
+  // min-force angle marker
+  const to = m.thOpt*R2D;
+  if(to >= 20 && to <= 80){
+    dash(ctx,[4,4],()=>{
+      ctx.strokeStyle="rgba(139,155,176,.55)"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(X(to),T); ctx.lineTo(X(to),T+phh); ctx.stroke();
+    });
+    label(ctx, "min force "+fx(to,1)+"°", X(to), T-8, {color:"#8b9bb0", size:9.5, align:"center"});
+  }
+
+  series("win", YR, "rgba(61,220,151,.75)", 1.6, 100);
+  series("vel", YL, "#c792ea", 1.8, 1);
+  series("ang", YL, "#4cc9f0", 2.2, 1);
+
+  // current angle — drop the caption a line when it would collide with θ*
+  const a0 = m.s.angle;
+  ctx.strokeStyle = "#ff8a3d"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(X(a0), T); ctx.lineTo(X(a0), T+phh); ctx.stroke();
+  const here = cur[Math.round((a0-20)/0.5)];
+  if(here && here.ang !== null){
+    ctx.fillStyle = "#4cc9f0"; ctx.beginPath(); ctx.arc(X(a0), YL(here.ang), 3.5, 0, 7); ctx.fill();
+    ctx.fillStyle = "#c792ea"; ctx.beginPath(); ctx.arc(X(a0), YL(here.vel), 3.5, 0, 7); ctx.fill();
+  }
+  const collide = (to >= 20 && to <= 80) && Math.abs(X(a0) - X(to)) < 62;
+  label(ctx, "you "+fx(a0,1)+"°", X(a0), collide ? T+10 : T-8, {color:"#ff8a3d", size:10, align:"center", weight:"600"});
+
+  // legend — wraps to a second row rather than clipping in narrow columns
+  const lg = [["angular ±°","#4cc9f0"],["velocity ±%","#c792ea"],["window cm","rgba(61,220,151,.9)"]];
+  ctx.font = '9.5px ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif';
+  let lx = L, ly = T+phh+45;
+  for(const [t,c] of lg){
+    const wNeeded = 14 + 4 + ctx.measureText(t).width;
+    if(lx > L && lx + wNeeded > L + pw){ lx = L; ly += 13; }
+    ctx.fillStyle = c; ctx.fillRect(lx, ly-1, 14, 3);
+    label(ctx, t, lx+18, ly, {color:"#8b9bb0", size:9.5, base:"middle"});
+    ctx.font = '9.5px ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif';
+    lx += wNeeded + 14;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * 4. Top-down court
+ * ------------------------------------------------------------------ */
+const COURT = {xMin:-8.2, xMax:8.2, yMin:-2.1, yMax:11.5};
+let courtMap = null;
+
+function drawCourt(){
+  const {ctx, w, h} = fit(document.getElementById("court"));
+  const m = model;
+  const s = Math.min((w-16)/(COURT.xMax-COURT.xMin), (h-16)/(COURT.yMax-COURT.yMin));
+  const ox = w/2, oy = 8 + (h-16 - (COURT.yMax-COURT.yMin)*s)/2 - COURT.yMin*s;
+  const X = x => ox + x*s, Y = y => oy + y*s;
+  courtMap = {X, Y, s, ox, oy};
+
+  ctx.fillStyle = "#0d131b"; ctx.fillRect(0,0,w,h);
+
+  const BASE = -1.575;                                     // baseline, rel. to hoop centre
+  ctx.strokeStyle = "#2b3a50"; ctx.lineWidth = 1.5;
+  ctx.strokeRect(X(-7.62), Y(BASE), 15.24*s, (COURT.yMax-BASE)*s);
+
+  // key + free-throw circle
+  ctx.strokeStyle = "#22304a";
+  ctx.strokeRect(X(-2.44), Y(BASE), 4.88*s, (4.215-BASE)*s);
+  ctx.beginPath(); ctx.arc(X(0), Y(4.215), 1.8*s, 0, 7); ctx.stroke();
+
+  // three-point line: corner segments (x = ±6.71) + arc of radius 7.24 about the hoop
+  const A3 = 7.24, CX3 = 6.71, CY3 = Math.sqrt(A3*A3 - CX3*CX3);
+  ctx.strokeStyle = "#2f4160"; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(X(-CX3), Y(BASE)); ctx.lineTo(X(-CX3), Y(CY3));
+  const tA = Math.atan2(CY3, -CX3), tB = Math.atan2(CY3, CX3);
+  for(let i=0;i<=120;i++){
+    const t = tA + (tB - tA)*i/120;
+    ctx.lineTo(X(A3*Math.cos(t)), Y(A3*Math.sin(t)));
+  }
+  ctx.lineTo(X(CX3), Y(BASE));
+  ctx.stroke();
+
+  // backboard + hoop + restricted arc
+  ctx.strokeStyle = "#4a5c78"; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(X(-0.9), Y(-0.375)); ctx.lineTo(X(0.9), Y(-0.375)); ctx.stroke();
+  ctx.strokeStyle = "#22304a"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(X(0), Y(0), 1.25*s, 0, Math.PI); ctx.stroke();
+  ctx.strokeStyle = "#e0503a"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(X(0), Y(0), Math.max(3, m.p.R*s), 0, 7); ctx.stroke();
+
+  // shot line + shooter
+  const px = m.s.off, py = Math.sqrt(Math.max(0, m.p.L*m.p.L - px*px));
+  dash(ctx,[4,4],()=>{
+    ctx.strokeStyle = "rgba(255,138,61,.6)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(X(px), Y(py)); ctx.lineTo(X(0), Y(0)); ctx.stroke();
+  });
+  ctx.fillStyle = "#ff8a3d";
+  ctx.beginPath(); ctx.arc(X(px), Y(py), 6, 0, 7); ctx.fill();
+  ctx.strokeStyle = "rgba(255,138,61,.35)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(X(px), Y(py), 11, 0, 7); ctx.stroke();
+  label(ctx, fx(m.p.L,2)+" m", X(px), Y(py)+22, {color:"#ffb27a", size:11, align:"center", weight:"600"});
+  label(ctx, "click or drag anywhere", X(0), Y(COURT.yMax)-6, {color:"#3b4a60", size:10, align:"center"});
+}
+
+(function courtInteraction(){
+  const c = document.getElementById("court");
+  let dragging = false;
+  const place = ev => {
+    if(!courtMap) return;
+    const r = c.getBoundingClientRect();
+    const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+    const cy = (ev.touches ? ev.touches[0].clientY : ev.clientY) - r.top;
+    let x = (cx - courtMap.ox)/courtMap.s;
+    let y = (cy - courtMap.oy)/courtMap.s;
+    y = Math.max(0.05, y);
+    let L = Math.hypot(x, y);
+    const Lc = clamp(L, 1, 10);
+    if(L > 1e-6 && Lc !== L) x *= Lc/L;
+    setVal("dist", Lc.toFixed(2));
+    setVal("off", clamp(x, -7, 7).toFixed(2));
+    restart(); recompute();
+  };
+  c.addEventListener("mousedown", e=>{ dragging = true; place(e); });
+  window.addEventListener("mousemove", e=>{ if(dragging) place(e); });
+  window.addEventListener("mouseup", ()=>{ dragging = false; });
+  c.addEventListener("touchstart", e=>{ e.preventDefault(); place(e); }, {passive:false});
+  c.addEventListener("touchmove",  e=>{ e.preventDefault(); place(e); }, {passive:false});
+})();
+
+/* ------------------------------------------------------------------ *
+ * 5. Metrics + explainer
+ * ------------------------------------------------------------------ */
+function drawMetrics(){
+  const m = model, p = m.p;
+  const cls = (v, good, warn) => v >= good ? "good" : v >= warn ? "warn" : "bad";
+  const tiles = [];
+  const push = (k, v, s, c="") => tiles.push('<div class="m"><div class="k">'+k+'</div><div class="v '+c+'">'+v+'</div><div class="s">'+(s||"&nbsp;")+'</div></div>');
+
+  if(m.ok){
+    push("Entry angle", fx(m.entry*R2D,1)+"°", "launched at "+fx(m.s.angle,1)+"°", cls(m.entry*R2D, 43, 35));
+    push("Effective opening", fx(m.effOpen/IN,2)+"″", "D·sin θₑ  ·  "+fx(m.effOpen*100,1)+" cm", "cy");
+    push("Swish window (depth)", (m.win>0?fx(m.win*100,1)+" cm":"closed"), (m.win>0?fx(m.win/IN,2)+"″ of fore/aft play":"ball cannot pass"), m.win>0?cls(m.win*100, 8, 3):"bad");
+    push("Swish window (lateral)", fx(m.winLat*100,1)+" cm", "fixed — arc doesn't help", "cy");
+    push("Angular tolerance", "±"+fx(m.tolAng*R2D,2)+"°", "+"+fx(m.tolUp*R2D,2)+"° / −"+fx(m.tolDn*R2D,2)+"°", cls(m.tolAng*R2D, 1.0, 0.4));
+    push("Velocity tolerance", "±"+fx(m.tolVel/m.v*100,2)+"%", "+"+fx(m.vUp/m.v*100,2)+"% / −"+fx(m.vDn/m.v*100,2)+"%", cls(m.tolVel/m.v*100, 2.0, 0.8));
+    push("Required velocity", fx(m.v,2)+" m/s", fx(m.v*2.23694,1)+" mph", "or");
+    push("Apex height", fx(m.apex,2)+" m", ftin(m.apex)+" · "+fx(m.apex-p.H,2)+" m above rim", "or");
+    push("Flight time", fx(m.tFlight,2)+" s", "release → rim");
+    push("Min entry angle", m.minEntry ? fx(m.minEntry*R2D,1)+"°" : "n/a",
+         "asin(d/D)" + (m.launchOpen ? " · needs "+fx(m.launchOpen*R2D,1)+"° launch" : " · unreachable here"));
+    push("Min-force angle", fx(m.thOpt*R2D,1)+"°", "also peak angular tolerance");
+    push("Same-force angle", m.companion ? fx(m.companion*R2D,1)+"°" : "none", m.companion ? "the other arc at this speed" : "single solution");
+  }else{
+    for(let i=0;i<12;i++) push("—","—","");
+  }
+  document.getElementById("metrics").innerHTML = tiles.join("");
+}
+
+function drawExplain(){
+  const m = model, p = m.p;
+  const e = m.ok ? m.entry*R2D : 0;
+  const Din = p.Drim/IN, din = p.dball/IN;
+  const html = [];
+
+  html.push(
+    "<div><h4>1 · The rim shrinks when you look at it sideways</h4>"+
+    "<p>The ball doesn't meet a "+fx(Din,1)+"″ circle — it meets that circle <strong>projected onto the plane it is flying through</strong>. "+
+    "Side to side the rim stays "+fx(Din,1)+"″ wide, but along the direction of travel it is squashed to <strong>D·sin θₑ</strong>.</p>"+
+    '<span class="eq">effective depth = D · sin θₑ\n              = '+fx(Din,1)+"″ · sin "+fx(e,1)+"° = <b>"+fx(m.ok?m.effOpen/IN:0,2)+"″</b></span>"+
+    "<p>Subtract the ball and what's left is the room the ball's centre has, fore and aft:</p>"+
+    '<span class="eq">W = D − d / sin θₑ\n  = '+fx(Din,1)+"″ − "+fx(din,1)+"″ / sin "+fx(e,1)+"° = <b>"+(m.ok?(m.win>0?fx(m.win/IN,2)+"″":"closed"):"—")+"</b></span></div>"
+  );
+
+  const minE = m.minEntry ? fx(m.minEntry*R2D,1) : "—";
+  const climbs = p.dy > 0;
+  html.push(
+    "<div><h4>2 · Below "+minE+"° of entry the window is gone</h4>"+
+    "<p>Set W = 0 and solve: the shot stops fitting when <strong>sin θₑ = d/D</strong>. With a "+fx(din,1)+"″ ball and a "+fx(Din,1)+
+    "″ rim that's <strong>"+minE+"°</strong> — no aim, no touch and no luck gets a flat ball through clean iron. "+
+    "That one number is the whole reason coaches talk about arc.</p>"+
+    "<p><strong>But entry angle isn't launch angle.</strong> "+
+    (climbs
+      ? "The rim sits "+fx(p.dy*100,0)+" cm above your release, so the ball is still shedding vertical speed as it climbs while its horizontal "+
+        "speed is untouched — it <strong>arrives shallower than it left</strong>"
+      : "Your release is above the rim, so the ball gains vertical speed on the way down and <strong>arrives steeper than it left</strong>")+
+    ": launched at "+fx(m.s.angle,1)+"°, it arrives at <strong>"+fx(e,1)+"°</strong>.</p>"+
+    (m.launchOpen ? "<p>From here you need <strong>"+fx(m.launchOpen*R2D,1)+"° at the hand</strong> just to crack the window open"+
+      (m.launch45 ? ", and <strong>"+fx(m.launch45*R2D,1)+"°</strong> to land the 45° entry that coaching data likes." : ".")+"</p>" : "")+
+    "</div>"
+  );
+
+  html.push(
+    "<div><h4>3 · Arc only helps in one direction</h4>"+
+    "<p>Steepening the shot stretches the ellipse's <em>depth</em> and does nothing for its width. The left/right window is "+
+    "<strong>D − d = "+fx((p.Drim-p.dball)*100,1)+" cm</strong> at every angle, forever. Arc forgives shooting long or short; only aim forgives shooting wide.</p>"+
+    "<p>That's why the ball's-eye ellipse is always wider than it is deep, and why only the depth clearance moves when you drag the angle slider.</p></div>"
+  );
+
+  html.push(
+    "<div><h4>4 · What arc actually costs</h4>"+
+    "<p>The three error measures don't peak together. The <strong>window</strong> and <strong>velocity tolerance</strong> both climb "+
+    "monotonically with arc — range goes as v², so a speed error moves the ball by dx/x ≈ 2·dv/v, making that tolerance track the window at "+
+    "roughly W/4L.</p>"+
+    "<p><strong>Angular tolerance doesn't.</strong> Required force bottoms out at <strong>θ* = 45° + ½·atan(Δy/L) = "+fx(m.thOpt*R2D,1)+
+    "°</strong>, and because range is stationary in angle there (∂x/∂θ = 0), θ* is <em>also</em> the angle most forgiving of launch-angle error. "+
+    "Either side of it, angular tolerance falls away.</p>"+
+    "<p>So a rainbow doesn't cost you touch — it costs <strong>aim precision and raw strength</strong>. A flat shot costs everything at once.</p>"+
+    (m.ok ? "<p>Right now: <strong>±"+fx(m.tolAng*R2D,2)+"°</strong> of launch-angle slack, <strong>±"+fx(m.tolVel/m.v*100,2)+
+      "%</strong> of speed slack (±"+fx(m.tolVel*100,1)+" cm/s out of "+fx(m.v,2)+" m/s), at "+fx(m.v*2.23694,1)+" mph.</p>" : "")+
+    "</div>"
+  );
+
+  document.getElementById("explain").innerHTML = html.join("");
+  document.getElementById("assump").innerHTML =
+    "<strong>Model limits.</strong> Swishes only — no backboard, rim contact or shooter's roll, so real make rates run higher than these "+
+    "windows. <strong>Air drag is neglected and is the biggest omission:</strong> at these speeds it's ≈14% of the ball's weight, so a real "+
+    "shooter needs some 2–3% more launch speed than shown — larger than the velocity tolerance itself. <strong>Backspin</strong> (Magnus lift, "+
+    "≈2.7% of weight, upward) is also neglected; it partly offsets drag and shifts entry angle by well under a degree. Neither touches the "+
+    "core result, since W = D − d/sin θₑ depends only on the entry angle, not on how the ball got it — backspin's real payoff is at rim "+
+    "<em>contact</em>, outside a swish-only model. Point-mass parabola with the ball's diameter reintroduced at the rim; the trajectory is "+
+    "treated as locally straight over the ~"+fx(p.dball*100,0)+" cm of its passage through the hoop. g = 9.8 m/s², no wind.";
+}
+
+/* ------------------------------------------------------------------ *
+ * Loop & wiring
+ * ------------------------------------------------------------------ */
+function drawStatic(){ drawRimView(); drawChart(); drawCourt(); drawMetrics(); drawExplain(); }
+function restart(){ anim.t = 0; }
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.05, (now-last)/1000); last = now;
+  if(model && model.ok && anim.playing){
+    anim.t += dt*model.s.speed;
+    if(anim.t > model.pathT) anim.t = 0;
+  }
+  if(model) drawSide();
+  requestAnimationFrame(frame);
+}
+
+document.getElementById("replay").addEventListener("click", ()=>{ anim.playing = true; document.getElementById("pause").textContent = "Pause"; restart(); });
+document.getElementById("pause").addEventListener("click", e=>{ anim.playing = !anim.playing; e.target.textContent = anim.playing ? "Pause" : "Play"; });
+document.getElementById("reset").addEventListener("click", ()=>{
+  for(const k in DEFAULTS) setVal(k, DEFAULTS[k]);
+  restart(); recompute();
+});
+
+let rt;
+window.addEventListener("resize", ()=>{ clearTimeout(rt); rt = setTimeout(drawStatic, 90); });
+
+recompute();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
