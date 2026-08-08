@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shot Tracker — Basketball Arc Simulator</title>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#121924; --panel-2:#0e141d; --line:#243043; --line-soft:#1a2430;
+    --txt:#e6edf6; --txt-dim:#8b9bb0; --txt-faint:#5d6c80;
+    --accent:#ff8a3d; --accent-2:#4cc9f0; --good:#3ddc97; --warn:#ffc857; --bad:#ff5d5d;
+    --shadow:0 1px 0 rgba(255,255,255,.03), 0 8px 24px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 600px at 15% -10%,#16202e 0%,transparent 60%),
+               radial-gradient(900px 500px at 95% 0%,#1a1622 0%,transparent 55%),var(--bg);
+    color:var(--txt); font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; min-height:100vh;
+  }
+  header{padding:20px 24px 15px;border-bottom:1px solid var(--line-soft);
+         display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px}
+  header h1{font-size:19px;margin:0;letter-spacing:-.2px;font-weight:650}
+  header h1 span{color:var(--accent)}
+  header p{margin:2px 0 0;color:var(--txt-dim);font-size:13px}
+  .xlink{background:#1b2534;border:1px solid var(--line);border-radius:9px;padding:8px 14px;
+         color:var(--txt);text-decoration:none;font-size:12.5px;font-weight:650;white-space:nowrap}
+  .xlink:hover{background:#243247;border-color:#33445d}
+
+  .wrap{padding:18px 24px 70px;max-width:1400px;margin:0 auto}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;align-items:start}
+  @media (max-width:980px){.grid{grid-template-columns:1fr}}
+
+  .panel{background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);
+         border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);margin-bottom:18px}
+  .panel > h2{margin:0;padding:11px 14px;font-size:12px;font-weight:650;letter-spacing:.7px;
+              text-transform:uppercase;color:var(--txt-dim);border-bottom:1px solid var(--line-soft);
+              display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .panel > h2 em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:450;
+                 color:var(--txt-faint);font-size:11px}
+  .body{padding:14px}
+
+  .setup{display:flex;flex-wrap:wrap;gap:10px;padding:14px;align-items:flex-end}
+  .fld{display:flex;flex-direction:column;gap:5px;min-width:130px;flex:1 1 auto}
+  .fld label{font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--txt-faint);font-weight:650}
+  select,input[type=number]{width:100%;background:#161f2b;color:var(--txt);border:1px solid var(--line);
+    border-radius:8px;padding:8px 9px;font:inherit;font-size:12.5px;font-weight:600}
+  button{background:#1b2534;color:var(--txt);border:1px solid var(--line);border-radius:9px;
+         padding:9px 14px;font:inherit;font-size:12.5px;font-weight:650;cursor:pointer}
+  button:hover{background:#243247;border-color:#33445d}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#1a0f05}
+  button.primary:hover{background:#ffa060}
+  button.ghost{background:transparent}
+  button:focus-visible,select:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+
+  /* logging pad — laid out like the rim seen from above */
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px}
+  .pad button{padding:0;height:74px;font-size:12px;font-weight:700;letter-spacing:.4px;
+              display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+  .pad .miss{background:#1a1016;border-color:#3a2028;color:#e0a0a0}
+  .pad .miss:hover{background:#2a161e;border-color:#5c2f3c}
+  .pad .miss b{font-size:15px;color:#ff8f8f}
+  .pad .make{background:linear-gradient(180deg,#176b4b,#0f4c36);border-color:#2fae7c;color:#d6ffee}
+  .pad .make:hover{background:linear-gradient(180deg,#1c845c,#136045)}
+  .pad .make b{font-size:22px;color:#7dffc4}
+  .pad .k{font-size:9.5px;color:var(--txt-faint);font-weight:600}
+
+  .live{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:1px;background:var(--line-soft)}
+  .live .m{background:var(--panel-2);padding:11px 12px}
+  .live .k{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--txt-faint)}
+  .live .v{font-size:23px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.5px;margin-top:2px}
+  .v.good{color:var(--good)} .v.warn{color:var(--warn)} .v.bad{color:var(--bad)}
+  .v.or{color:var(--accent)} .v.cy{color:var(--accent-2)}
+
+  .bar{height:7px;background:var(--line);border-radius:4px;overflow:hidden;margin:10px 14px 14px}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--good));width:0}
+
+  canvas{display:block;width:100%}
+  #rimmap{aspect-ratio:1/0.86}
+  #trend{aspect-ratio:16/6}
+
+  .diag{padding:14px;font-size:13px;color:var(--txt-dim);line-height:1.55}
+  .diag h4{margin:0 0 7px;font-size:13.5px;color:var(--accent-2);font-weight:700}
+  .diag strong{color:var(--txt)}
+  .diag .big{font-size:15px;color:var(--good);font-weight:700}
+  .diag table{width:100%;border-collapse:collapse;margin:10px 0 4px;font-size:12.5px}
+  .diag th{text-align:left;color:var(--txt-faint);font-weight:650;font-size:10.5px;
+           text-transform:uppercase;letter-spacing:.5px;padding:4px 8px 4px 0;border-bottom:1px solid var(--line-soft)}
+  .diag td{padding:5px 8px 5px 0;border-bottom:1px solid var(--line-soft);font-variant-numeric:tabular-nums}
+  .diag tr:last-child td{border-bottom:0}
+  .diag .lead td{color:var(--good);font-weight:700}
+  .note{color:var(--txt-faint);font-size:11.5px;margin:9px 0 0}
+
+  .hist{max-height:280px;overflow:auto;padding:0 14px 14px}
+  .hrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+  .hrow:last-child{border-bottom:0}
+  .hrow .d{color:var(--txt-faint);font-size:11px;min-width:96px}
+  .hrow .n{color:var(--txt-dim);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hrow .p{font-weight:700;font-variant-numeric:tabular-nums}
+  .empty{color:var(--txt-faint);font-size:12.5px;padding:14px;text-align:center}
+  .kbd{display:inline-block;background:#0d131c;border:1px solid var(--line);border-radius:4px;
+       padding:0 5px;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:var(--txt-dim)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Shot <span>Tracker</span></h1>
+    <p>Log a session, see where the misses go, and find out what to train next.</p>
+  </div>
+  <a class="xlink" href="index.html">← Physics simulator</a>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+    <div>
+
+      <section class="panel">
+        <h2>Session <em id="sesnote">pick a drill and start shooting</em></h2>
+        <div class="setup">
+          <div class="fld"><label for="drill">Drill</label><select id="drill"></select></div>
+          <div class="fld"><label for="spot">Spot</label><select id="spot"></select></div>
+          <div class="fld" style="max-width:110px"><label for="target">Shots</label>
+            <input type="number" id="target" min="5" max="200" step="1" value="25"></div>
+          <button id="start" class="primary">Start session</button>
+          <button id="finish" class="ghost" disabled>Finish</button>
+        </div>
+        <div class="bar"><i id="prog"></i></div>
+        <div class="live" id="live"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Log the shot <em>tap where it went · <span class="kbd">space</span> make · <span class="kbd">↑↓←→</span> miss · <span class="kbd">U</span> undo</em></h2>
+        <div class="pad" id="pad"></div>
+        <div style="padding:0 14px 14px;display:flex;gap:8px">
+          <button id="undo" class="ghost">Undo last</button>
+          <button id="clear" class="ghost">Discard session</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Diagnosis <em>what your pattern says to train</em></h2>
+        <div class="diag" id="diag"></div>
+      </section>
+
+    </div>
+
+    <div>
+      <section class="panel">
+        <h2>Miss map <em>where they went at the rim</em></h2>
+        <canvas id="rimmap"></canvas>
+      </section>
+
+      <section class="panel">
+        <h2>History</h2>
+        <canvas id="trend"></canvas>
+        <div class="hist" id="hist"></div>
+        <div style="padding:0 14px 14px"><button id="wipe" class="ghost">Clear history</button></div>
+      </section>
+    </div>
+
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* Priority map precomputed by the physics engine in index.html: for a grid of
+ * (aim sigma, release-speed sigma) it holds
+ *     [ make %, lateral share of misses %, gain from 30% tighter aim, gain from 30% tighter force ]
+ * Two observables — make rate and the left/right share of misses — are enough to
+ * locate a shooter on that grid, which is what turns tally marks into a training
+ * priority. Depth misses get rescued by rim bounces and lateral ones do not, so
+ * this cannot be shortcut with a "compare spread to window" rule. */
+const PRIO = {"arc":57,"aim":[0.3,0.6,0.9,1.2,1.6,2,2.6,3.2],"vel":[0.6,1.2,1.8,2.5,3.2,4,5],"spots":{"ft":{"L":4.19,"grid":[[[77.8,7,2.9,3.2],[66,7,0.9,5],[56.4,6,1.5,7.8],[47.7,5,1.5,9.5],[43,6,3.1,6.6],[41.9,5,1.2,4.3],[39.3,4,0,3.1]],[[72.2,19,3.8,3.5],[60.3,22,3.3,7.2],[50.7,17,3,10.1],[42.7,16,3.8,8.2],[40.5,14,2.4,4.5],[36.9,12,2.7,3.7],[34.6,11,1.5,4.4]],[[70.4,35,1,1.6],[55.5,30,3.9,9.4],[44,29,5,9.7],[38.3,24,4.6,9.2],[35.2,21,5.1,5.8],[35,20,2,3],[31.2,17,3.9,3.2]],[[61,41,10.5,3.2],[49.9,36,5.5,5.5],[40.5,32,5.4,7.9],[36.1,29,4.9,5.4],[31,26,4,8.1],[29.5,24,5,3.5],[28,19,3.7,3.2]],[[54,49,8.6,1.9],[42,48,7.6,6.2],[33.3,41,10.5,7.5],[30,35,3.7,5.5],[25.7,32,6.1,5.4],[23.9,29,5.7,5.3],[24,22,3.5,2.4]],[[45,53,13.7,1],[36,55,8,4.4],[28.1,44,8.4,5.7],[26.3,40,4.7,3.6],[21.3,37,8.4,5.1],[21.9,31,4.2,1.5],[18.9,30,7,2]],[[35.7,63,12.3,2.1],[29.7,59,8.7,5.1],[23.9,53,8.3,3.2],[19.6,48,7.2,5],[18.2,44,6.4,3.3],[16.1,40,7.9,4.3],[15.4,37,4.6,1.3]],[[30.8,67,10.8,3.5],[24.2,66,10.8,5.4],[20.4,60,6.9,3.1],[17.4,55,5.4,1.5],[13.5,49,6.5,4.2],[14.5,44,5.2,2.3],[12.5,41,4.3,2.2]]]},"mid":{"L":5.5,"grid":[[[61.4,13,1.3,4.2],[50.3,11,-0.8,5.4],[41.2,11,4.5,6.2],[38.7,9,0.9,4.3],[36.8,7,0.9,4],[34.8,7,0.2,3.3],[30.1,6,1.8,5.5]],[[57.3,26,0.4,3],[44.2,22,4.5,5.4],[36.2,19,4.8,7],[35.2,15,3.8,2.3],[34.3,13,1.1,1],[30,15,4.5,5],[27.7,11,2.9,2.7]],[[49.5,35,6.7,2],[38.1,33,7.1,6.8],[33.6,27,4,5.6],[28.6,23,6.5,5.5],[26.6,19,6.8,4.4],[25.5,19,3.4,1],[23.9,17,2.7,2.7]],[[39.7,41,11.2,2.5],[32.3,36,7.5,4.4],[26.6,32,8.7,4.9],[24.5,29,6.8,4.4],[21.6,26,7,3.6],[20.3,23,6.4,3.7],[20.3,21,3.1,2.9]],[[32.6,50,10.6,3],[26,44,8,3.8],[24.3,41,4.4,2.8],[21.1,38,5.7,2],[18.4,32,6.2,2.9],[17,28,4.1,1.5],[15.3,24,5,2.5]],[[27.3,55,9.2,1.8],[21.4,49,7.9,3.5],[17.7,46,7.6,3.4],[17.1,43,4.9,0.5],[17.1,36,3.6,-0.5],[13.5,37,6.2,4.3],[13.2,33,4.4,1.9]],[[23.1,64,6,0.6],[17.6,58,7.4,2.4],[14.3,56,6.8,1.9],[13.3,49,4.9,0.5],[12.5,46,4.4,1.1],[11.1,39,3.3,1.7],[9.7,37,4.1,3.1]],[[17.9,70,7.1,0.8],[14.6,65,6,2.1],[11.4,61,4.4,3],[10.4,55,3.9,0.8],[9.1,51,5.8,1.7],[8.9,48,2.6,2],[7.6,44,4.4,1.8]]]},"three":{"L":7.24,"grid":[[[47.5,12,0.1,0.4],[38.8,11,3.5,5.4],[36.5,11,1.1,1.2],[33.8,9,0,2.6],[31.6,8,-0.6,1.9],[28.5,7,-0.4,2.7],[25,7,2,6.2]],[[39.4,24,6.2,0.8],[32.7,22,4.6,4.4],[29.8,19,6,3.5],[28.1,17,3,2.7],[25.8,14,4.5,5.4],[23.8,14,3.3,4.2],[20.2,11,2.1,4.8]],[[31,33,7.2,1.9],[26.6,29,5,4],[25.7,27,5.6,1.2],[22.5,24,4.2,3.9],[21.5,22,4.2,1.8],[18.5,19,5,3.4],[18.4,17,3.4,1]],[[24.9,41,8.6,4.1],[22,36,5.9,4.8],[19.7,33,7,2.5],[18.3,30,7.6,2.1],[16,26,6.7,2.9],[15.8,23,3.6,3.6],[13.9,19,4.5,2.7]],[[18.9,49,7,3],[16.9,46,6.5,2.1],[16.1,44,4.6,1.7],[15,38,4.3,0.3],[11.5,35,6.5,2.7],[12,28,4.9,1.5],[9,26,4.7,5.2]],[[16.3,55,8.1,2.1],[14.5,54,3.8,0.4],[11.9,48,5,1.4],[11.1,44,4.3,0.8],[11,41,4.2,1],[9.7,36,3.5,2.6],[7.8,30,6.3,3]],[[13.1,64,3.7,-1.1],[11.2,61,3.5,0.5],[10,57,4.5,1],[8.5,52,2.8,2.8],[9,46,2.8,1],[7.3,39,3,1.6],[7.6,37,2.6,1.5]],[[10.8,72,3.1,0.5],[7.9,68,5,1.1],[7.6,62,5,1.9],[8.2,57,1.8,0.8],[7.5,52,2.8,0.6],[5.2,49,2.5,1.4],[5.8,41,2.1,1.3]]]}}};
+
+const SPOTS = [
+  {id:"ft",    name:"Free throw (4.19 m)", L:4.19, prio:"ft"},
+  {id:"mid",   name:"Mid-range (5.5 m)",   L:5.50, prio:"mid"},
+  {id:"three", name:"Three (7.24 m)",      L:7.24, prio:"three"},
+  {id:"close", name:"Close range (2 m)",   L:2.00, prio:null},
+  {id:"elbow", name:"Elbow (4.5 m)",       L:4.50, prio:"ft"},
+  {id:"wing3", name:"Wing three (7.0 m)",  L:7.00, prio:"three"}
+];
+const DRILLS = [
+  {id:"ft25",   name:"Free throws — 25",       spot:"ft",    n:25, goal:0.72},
+  {id:"spot25", name:"Spot shooting — 25",     spot:"mid",   n:25, goal:0.45},
+  {id:"three25",name:"Three-point — 25",       spot:"three", n:25, goal:0.35},
+  {id:"atw",    name:"Around the world — 30",  spot:"mid",   n:30, goal:0.45},
+  {id:"free",   name:"Free session",           spot:"mid",   n:50, goal:0.40}
+];
+// 8 miss directions + make, laid out as the rim seen from above
+const DIRS = [
+  {k:"SL", lbl:"Short + Left",  lat:-1, dep:-1, key:null},
+  {k:"S",  lbl:"Short",         lat: 0, dep:-1, key:"ArrowDown"},
+  {k:"SR", lbl:"Short + Right", lat:+1, dep:-1, key:null},
+  {k:"L",  lbl:"Left",          lat:-1, dep: 0, key:"ArrowLeft"},
+  {k:"MK", lbl:"MAKE",          lat: 0, dep: 0, key:" "},
+  {k:"R",  lbl:"Right",         lat:+1, dep: 0, key:"ArrowRight"},
+  {k:"LL", lbl:"Long + Left",   lat:-1, dep:+1, key:null},
+  {k:"LO", lbl:"Long",          lat: 0, dep:+1, key:"ArrowUp"},
+  {k:"LR", lbl:"Long + Right",  lat:+1, dep:+1, key:null}
+];
+const KEY = "bball-tracker-v1";
+const fx=(v,d)=>Number.isFinite(v)?v.toFixed(d):"—";
+
+let ses = null;                                   // active session
+let hist = load();
+
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(hist.slice(-100))); }catch(e){} }
+
+/* ---------- build UI ---------- */
+(function(){
+  const d=document.getElementById("drill"), s=document.getElementById("spot");
+  DRILLS.forEach(x=>{ const o=document.createElement("option"); o.value=x.id; o.textContent=x.name; d.appendChild(o); });
+  SPOTS.forEach(x=>{ const o=document.createElement("option"); o.value=x.id; o.textContent=x.name; s.appendChild(o); });
+  const pad=document.getElementById("pad");
+  DIRS.forEach(x=>{
+    const b=document.createElement("button");
+    b.className = x.k==="MK" ? "make" : "miss";
+    b.dataset.k = x.k;
+    b.innerHTML = x.k==="MK" ? "<b>MAKE</b><span class='k'>space</span>"
+      : "<b>"+(x.k==="LO"?"LONG":x.k)+"</b><span class='k'>"+x.lbl+"</span>";
+    b.addEventListener("click", ()=>log(x.k));
+    pad.appendChild(b);
+  });
+  d.addEventListener("change", ()=>{
+    const dr=DRILLS.find(z=>z.id===d.value);
+    s.value=dr.spot; document.getElementById("target").value=dr.n;
+  });
+  d.dispatchEvent(new Event("change"));
+  document.getElementById("start").addEventListener("click", start);
+  document.getElementById("finish").addEventListener("click", finish);
+  document.getElementById("undo").addEventListener("click", undo);
+  document.getElementById("clear").addEventListener("click", ()=>{ ses=null; render(); });
+  document.getElementById("wipe").addEventListener("click", ()=>{
+    if(confirm("Delete all saved sessions?")){ hist=[]; save(); render(); }
+  });
+  window.addEventListener("keydown", e=>{
+    if(/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+    if(e.key==="u"||e.key==="U"){ undo(); e.preventDefault(); return; }
+    const hit=DIRS.find(x=>x.key===e.key);
+    if(hit){ log(hit.k); e.preventDefault(); }
+  });
+})();
+
+function start(){
+  const dr=DRILLS.find(x=>x.id===document.getElementById("drill").value);
+  const sp=SPOTS.find(x=>x.id===document.getElementById("spot").value);
+  ses={ ts:Date.now(), drill:dr.name, drillId:dr.id, spot:sp.id, spotName:sp.name,
+        L:sp.L, prio:sp.prio, target:+document.getElementById("target").value||25,
+        goal:dr.goal, shots:[] };
+  render();
+}
+function log(k){
+  if(!ses){ start(); }
+  ses.shots.push(k);
+  if(ses.shots.length >= ses.target) finish(true);
+  else render();
+}
+function undo(){ if(ses && ses.shots.length){ ses.shots.pop(); render(); } }
+function finish(auto){
+  if(!ses || !ses.shots.length){ ses=null; render(); return; }
+  hist.push(ses); save();
+  const done=ses; ses=null; render(done);
+  if(auto) document.getElementById("sesnote").textContent="session complete — logged to history";
+}
+
+/* ---------- stats ---------- */
+function stats(sh){
+  const n=sh.length, made=sh.filter(x=>x==="MK").length;
+  let streak=0, best=0;
+  for(const x of sh){ if(x==="MK"){ streak++; best=Math.max(best,streak); } else streak=0; }
+  const cnt={}; DIRS.forEach(d=>cnt[d.k]=0); sh.forEach(x=>cnt[x]++);
+  // diagonals split evenly between the two axes, matching how the grid labels a miss
+  const latScore = cnt.L+cnt.R + 0.5*(cnt.SL+cnt.SR+cnt.LL+cnt.LR);
+  const depScore = cnt.S+cnt.LO + 0.5*(cnt.SL+cnt.SR+cnt.LL+cnt.LR);
+  const misses = n-made;
+  return {n, made, pct: n? made/n : 0, streak, best, cnt, misses,
+          latShare: (latScore+depScore) ? latScore/(latScore+depScore) : 0,
+          leftBias: cnt.L+cnt.SL+cnt.LL, rightBias: cnt.R+cnt.SR+cnt.LR,
+          shortBias: cnt.S+cnt.SL+cnt.SR, longBias: cnt.LO+cnt.LL+cnt.LR};
+}
+
+/* Locate the shooter on the precomputed grid from two observables. */
+function diagnose(st, prioKey){
+  const sp = PRIO.spots[prioKey]; if(!sp) return null;
+  let best=null;
+  for(let i=0;i<PRIO.aim.length;i++){
+    for(let j=0;j<PRIO.vel.length;j++){
+      const c=sp.grid[i][j];
+      const e = Math.pow((c[0]-st.pct*100)/9, 2) + Math.pow((c[1]-st.latShare*100)/14, 2);
+      if(!best || e<best.e) best={e, i, j, cell:c};
+    }
+  }
+  return { sigAim:PRIO.aim[best.i], sigVel:PRIO.vel[best.j],
+           modelPct:best.cell[0], modelLat:best.cell[1],
+           aimGain:best.cell[2], velGain:best.cell[3],
+           lever: best.cell[2] >= best.cell[3] ? "aim" : "force" };
+}
+
+/* ---------- render ---------- */
+function render(justFinished){
+  const sh = ses? ses.shots : (justFinished? justFinished.shots : []);
+  const ctx = ses || justFinished;
+  const st = stats(sh);
+
+  document.getElementById("finish").disabled = !(ses && sh.length);
+  if(ses) document.getElementById("sesnote").textContent =
+    ses.drill+" · "+ses.spotName+" · "+sh.length+"/"+ses.target;
+
+  const tiles=[];
+  const push=(k,v,c)=>tiles.push('<div class="m"><div class="k">'+k+'</div><div class="v '+(c||"")+'">'+v+'</div></div>');
+  push("Attempts", st.n);
+  push("Makes", st.made, "good");
+  push("Percentage", st.n? (st.pct*100).toFixed(0)+"%" : "—",
+       st.n<5?"":(ctx&&ctx.goal? (st.pct>=ctx.goal?"good":st.pct>=ctx.goal*0.75?"warn":"bad") : ""));
+  push("Streak", st.streak, "or");
+  push("Best streak", st.best, "cy");
+  push("Left / Right", st.leftBias+" / "+st.rightBias);
+  push("Short / Long", st.shortBias+" / "+st.longBias);
+  document.getElementById("live").innerHTML = tiles.join("");
+
+  const goalPct = ctx ? Math.min(1, sh.length/ctx.target) : 0;
+  document.getElementById("prog").style.width = (goalPct*100).toFixed(1)+"%";
+
+  drawRim(st);
+  drawTrend();
+  drawHist();
+  drawDiag(st, ctx);
+}
+
+function drawDiag(st, ctx){
+  const el=document.getElementById("diag");
+  if(!ctx || st.n===0){
+    el.innerHTML = "<p>Start a session and log some shots. Tap the pad where each miss went — "+
+      "the left/right versus short/long split is what makes a diagnosis possible.</p>"+
+      "<p class='note'>Everything is stored on this device only.</p>";
+    return;
+  }
+  if(st.n < 15){
+    el.innerHTML = "<h4>Keep going — "+(15-st.n)+" more shots</h4>"+
+      "<p>A diagnosis needs at least 15 attempts. Below that the make rate alone swings by "+
+      "±13 percentage points from luck, which is larger than any real effect.</p>";
+    return;
+  }
+  const d = ctx.prio ? diagnose(st, ctx.prio) : null;
+  const se = Math.sqrt(st.pct*(1-st.pct)/st.n)*100;
+  const parts = [];
+
+  parts.push("<h4>You shot "+(st.pct*100).toFixed(0)+"% ("+st.made+"/"+st.n+
+    ") <span style='color:var(--txt-faint);font-weight:400'>±"+se.toFixed(0)+" pts</span></h4>");
+
+  if(!d){
+    parts.push("<p>This spot has no calibrated model — use the free throw, mid-range or "+
+      "three-point spots for a diagnosis.</p>");
+    el.innerHTML = parts.join(""); return;
+  }
+
+  const lead = d.lever==="aim" ? "Left/right aim" : "Release force";
+  const gain = Math.max(d.aimGain, d.velGain), other = Math.min(d.aimGain, d.velGain);
+  parts.push("<p>"+(st.latShare*100).toFixed(0)+"% of your misses were left or right. Matching that "+
+    "against the physics model puts you near <strong>±"+d.sigAim+"° of aim scatter</strong> and "+
+    "<strong>±"+d.sigVel+"% of release-speed scatter</strong>.</p>");
+
+  parts.push("<p>Train <span class='big'>"+lead+"</span> first.</p>");
+  parts.push("<table><tr><th>Tighten by 30%</th><th>Make rate</th><th>Gain</th></tr>"+
+    "<tr class="+(d.lever==="aim"?"'lead'":"''")+"><td>Left/right aim</td><td>"+
+      fx(d.modelPct+d.aimGain,0)+"%</td><td>+"+fx(d.aimGain,1)+" pts</td></tr>"+
+    "<tr class="+(d.lever==="force"?"'lead'":"''")+"><td>Release force</td><td>"+
+      fx(d.modelPct+d.velGain,0)+"%</td><td>+"+fx(d.velGain,1)+" pts</td></tr>"+
+    "</table>");
+  parts.push("<p>Working the other one instead buys about +"+fx(other,1)+
+    " points — roughly "+(other>0.1? (gain/other).toFixed(1)+"× less" : "nothing")+".</p>");
+
+  if(st.leftBias+st.rightBias >= 4){
+    const skew = st.rightBias-st.leftBias, tot = st.rightBias+st.leftBias;
+    if(Math.abs(skew) >= Math.max(3, tot*0.55))
+      parts.push("<p><strong>You also have a consistent "+(skew>0?"right":"left")+" bias</strong> ("+
+        st.rightBias+" right vs "+st.leftBias+" left). A bias is an aiming error, not a consistency "+
+        "problem — it is the quickest thing on this page to fix.</p>");
+  }
+  if(st.shortBias+st.longBias >= 4){
+    const skew = st.longBias-st.shortBias, tot = st.longBias+st.shortBias;
+    if(Math.abs(skew) >= Math.max(3, tot*0.55))
+      parts.push("<p><strong>Consistently "+(skew>0?"long":"short")+"</strong> ("+st.longBias+
+        " long vs "+st.shortBias+" short) — that is a distance calibration issue, again a bias rather than scatter.</p>");
+  }
+
+  // Hand off to the simulator as an explainer: the same shot at their current
+  // scatter, and again at the tightened value, so the difference is visible.
+  const now  = d.lever==="aim" ? d.sigAim : 0;
+  const tight= d.lever==="aim" ? +(d.sigAim*0.7).toFixed(2) : 0;
+  const trimNow   = d.lever==="force" ? d.sigVel : 0;
+  const trimTight = d.lever==="force" ? +(d.sigVel*0.7).toFixed(2) : 0;
+  const q = e => "index.html?dist="+ctx.L.toFixed(2)+"&angle="+PRIO.arc+
+                 "&aim="+(e?tight:now)+"&trim="+(e?trimTight:trimNow)+"&view=sim3d";
+  parts.push("<p style='margin-top:12px;display:flex;gap:8px;flex-wrap:wrap'>"+
+    "<a class='xlink' href='"+q(false)+"'>Watch your miss →</a>"+
+    "<a class='xlink' href='"+q(true)+"'>Watch it 30% tighter →</a></p>");
+  parts.push("<p class='note'>Both open the 3D simulation at your distance. The first loads a typical "+
+    "miss at your measured "+(d.lever==="aim"?"aim":"force")+" scatter; the second loads the same shot "+
+    "with that error cut by 30%, so you can see the clearance the training actually buys you. Sigma "+
+    "estimates come from matching your make rate and miss split against a simulated grid — read them "+
+    "as a band, not a measurement.</p>");
+  el.innerHTML = parts.join("");
+}
+
+function fitCanvas(c){
+  const r=c.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+  const w=Math.max(1,Math.round(r.width)), h=Math.max(1,Math.round(r.height));
+  if(c.width!==w*dpr||c.height!==h*dpr){ c.width=w*dpr; c.height=h*dpr; }
+  const x=c.getContext("2d"); x.setTransform(dpr,0,0,dpr,0,0); x.clearRect(0,0,w,h);
+  return {x,w,h};
+}
+function txt(x,s,px,py,o){ o=o||{}; x.fillStyle=o.c||"#8b9bb0";
+  x.font=(o.w||"")+" "+(o.s||11)+"px ui-sans-serif,-apple-system,Segoe UI,Roboto,sans-serif";
+  x.textAlign=o.a||"left"; x.textBaseline=o.b||"alphabetic"; x.fillText(s,px,py); }
+
+function drawRim(st){
+  const {x,w,h}=fitCanvas(document.getElementById("rimmap"));
+  if(w<40) return;
+  const cx=w/2, cy=h/2+6, R=Math.min(w,h)*0.27;
+  x.strokeStyle="#e0503a"; x.lineWidth=3;
+  x.beginPath(); x.arc(cx,cy,R,0,7); x.stroke();
+  x.strokeStyle="#1e2a3c"; x.lineWidth=1;
+  x.setLineDash([3,5]);
+  x.beginPath(); x.moveTo(cx-R*2.1,cy); x.lineTo(cx+R*2.1,cy); x.stroke();
+  x.beginPath(); x.moveTo(cx,cy-R*1.9); x.lineTo(cx,cy+R*1.9); x.stroke();
+  x.setLineDash([]);
+  txt(x,"LONG",cx,cy-R*1.9-6,{a:"center",s:10,c:"#4a5a70"});
+  txt(x,"SHORT",cx,cy+R*1.9+14,{a:"center",s:10,c:"#4a5a70"});
+  txt(x,"LEFT",cx-R*2.1-4,cy,{a:"right",s:10,c:"#4a5a70",b:"middle"});
+  txt(x,"RIGHT",cx+R*2.1+4,cy,{s:10,c:"#4a5a70",b:"middle"});
+
+  const max=Math.max(1,...DIRS.filter(d=>d.k!=="MK").map(d=>st.cnt[d.k]||0));
+  for(const d of DIRS){
+    const n=st.cnt[d.k]||0;
+    if(d.k==="MK"){
+      if(!n) continue;
+      x.fillStyle="rgba(61,220,151,.22)"; x.beginPath(); x.arc(cx,cy,R*0.62,0,7); x.fill();
+      txt(x,String(n),cx,cy+1,{a:"center",b:"middle",s:19,w:"700",c:"#3ddc97"});
+      txt(x,"made",cx,cy+17,{a:"center",b:"middle",s:9.5,c:"#3ddc97"});
+      continue;
+    }
+    if(!n) continue;
+    const px=cx+d.lat*R*1.5, py=cy-d.dep*R*1.5;
+    const rr=6+18*(n/max);
+    x.fillStyle="rgba(255,93,93,"+(0.20+0.45*(n/max)).toFixed(2)+")";
+    x.beginPath(); x.arc(px,py,rr,0,7); x.fill();
+    x.strokeStyle="#ff5d5d"; x.lineWidth=1.2; x.beginPath(); x.arc(px,py,rr,0,7); x.stroke();
+    txt(x,String(n),px,py+1,{a:"center",b:"middle",s:12,w:"700",c:"#ffd0d0"});
+  }
+  if(!st.n) txt(x,"no shots logged yet",cx,h-10,{a:"center",s:11,c:"#3b4a60"});
+}
+
+function drawTrend(){
+  const {x,w,h}=fitCanvas(document.getElementById("trend"));
+  if(w<40) return;
+  const rows=hist.slice(-24);
+  const L=30,Rm=8,T=12,B=18, pw=w-L-Rm, ph=h-T-B;
+  x.strokeStyle="#1a2430"; x.lineWidth=1;
+  for(let i=0;i<=4;i++){ const y=T+ph*i/4;
+    x.beginPath(); x.moveTo(L,y); x.lineTo(L+pw,y); x.stroke();
+    txt(x,(100-i*25)+"%",L-5,y+3,{a:"right",s:9,c:"#4a5a70"}); }
+  if(rows.length<1){ txt(x,"finish a session to build a trend",L+pw/2,T+ph/2,{a:"center",s:11,c:"#3b4a60"}); return; }
+  const pts=rows.map((r,i)=>{
+    const s=stats(r.shots);
+    return {px:L+(rows.length===1?pw/2:pw*i/(rows.length-1)), py:T+ph*(1-s.pct), pct:s.pct};
+  });
+  x.strokeStyle="#ff8a3d"; x.lineWidth=2; x.beginPath();
+  pts.forEach((p,i)=> i?x.lineTo(p.px,p.py):x.moveTo(p.px,p.py)); x.stroke();
+  pts.forEach(p=>{ x.fillStyle="#ff8a3d"; x.beginPath(); x.arc(p.px,p.py,3,0,7); x.fill(); });
+  const avg=pts.reduce((s,p)=>s+p.pct,0)/pts.length;
+  x.strokeStyle="rgba(76,201,240,.6)"; x.setLineDash([4,4]);
+  x.beginPath(); x.moveTo(L,T+ph*(1-avg)); x.lineTo(L+pw,T+ph*(1-avg)); x.stroke(); x.setLineDash([]);
+  txt(x,"avg "+(avg*100).toFixed(0)+"%",L+pw,T+ph*(1-avg)-5,{a:"right",s:9.5,c:"#4cc9f0"});
+}
+
+function drawHist(){
+  const el=document.getElementById("hist");
+  if(!hist.length){ el.innerHTML="<div class='empty'>No sessions yet.</div>"; return; }
+  el.innerHTML = hist.slice().reverse().slice(0,40).map(r=>{
+    const s=stats(r.shots);
+    const d=new Date(r.ts);
+    const cls = s.pct>=(r.goal||0.4) ? "good" : s.pct>=(r.goal||0.4)*0.75 ? "warn":"bad";
+    return "<div class='hrow'><span class='d'>"+
+      d.toLocaleDateString(undefined,{month:"short",day:"numeric"})+" "+
+      d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"})+
+      "</span><span class='n'>"+r.drill+" · "+r.spotName+"</span>"+
+      "<span class='p v "+cls+"' style='font-size:13px'>"+s.made+"/"+s.n+
+      " · "+(s.pct*100).toFixed(0)+"%</span></div>";
+  }).join("");
+}
+
+let rt; window.addEventListener("resize", ()=>{ clearTimeout(rt); rt=setTimeout(()=>render(),100); });
+render();
+</script>
+</body>
+</html>

@@ -375,3 +375,43 @@ bound* on real forgiveness.
 ## License
 
 MIT
+
+---
+
+# Shot Tracker (`tracker.html`)
+
+A practice logger that turns tally marks into a training priority, using the simulator as its
+physics engine. Open `tracker.html`, or follow "Shot tracker →" from the simulator.
+
+**Log fast.** Pick a drill, then tap a 3×3 pad laid out like the rim seen from above — MAKE in the
+middle, eight miss directions around it. Keyboard works too: `space` for a make, arrow keys for the
+cardinal misses, `U` to undo. Live attempts / makes / percentage / streak, plus a progress bar
+against the drill's target.
+
+**Diagnose.** Two observables — the make rate and the **left/right share of misses** — are enough
+to locate a shooter on a grid of (aim scatter, release-speed scatter) precomputed by the 3D contact
+engine. From that the tracker reports estimated σ for each, which lever to train, and what a 30%
+tightening of each would actually be worth in percentage points.
+
+That inversion has to be done with the real physics. The obvious shortcut — compare miss spread to
+the swish window — gets it **backwards**, because depth misses are frequently rescued by rim
+bounces while lateral misses never are. The precomputed grid captures that; a window ratio doesn't.
+
+The crossover the engine finds:
+
+| Aim scatter | Binding constraint |
+|---|---|
+| σ ≳ 0.9° | **Left/right aim**, at every distance |
+| σ ≲ 0.6° | **Release force** |
+
+It also separates **bias from scatter** — a consistent right miss or a consistent short miss is an
+aiming/calibration error and is far quicker to fix than reducing spread, so it's called out
+separately.
+
+**Explain.** The diagnosis links back into the simulator twice: once preloaded with the player's
+own distance and measured scatter, and once with that error cut by 30% — so the clearance the
+training buys is something you watch rather than something you're told.
+
+Sessions persist in `localStorage` (device-only), with history and a trend chart. A diagnosis needs
+15+ attempts; below that the make rate alone swings ±13 points on luck, which the app says rather
+than pretending otherwise.

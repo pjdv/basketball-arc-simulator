@@ -52,6 +52,7 @@
   }
   .tab:hover{color:var(--txt)}
   .tab.is-on{background:var(--accent);color:#1a0f05}
+  .tab-link{text-decoration:none;display:inline-flex;align-items:center;border-left:1px solid var(--line);margin-left:2px}
   .tab:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
 
   .wrap{padding:18px 24px 60px;max-width:1780px;margin:0 auto}
@@ -238,6 +239,7 @@
   <nav class="tabs">
     <button class="tab is-on" data-view="sim3d">3D flight &amp; bounce</button>
     <button class="tab" data-view="analysis">Geometry &amp; error analysis</button>
+    <a class="tab tab-link" href="tracker.html">Shot tracker →</a>
   </nav>
 </header>
 
@@ -2663,6 +2665,26 @@ document.getElementById("reset").addEventListener("click", ()=>{
 
 let rt;
 window.addEventListener("resize", ()=>{ clearTimeout(rt); rt = setTimeout(drawStatic, 90); });
+
+// Deep link: index.html?dist=5.5&aim=1.2&trim=0&angle=57&view=sim3d
+(function fromQuery(){
+  const q = new URLSearchParams(location.search);
+  if(![...q.keys()].length) return;
+  let touched = false;
+  for(const it of ITEMS){
+    if(!q.has(it.id)) continue;
+    const v = parseFloat(q.get(it.id));
+    if(!Number.isFinite(v)) continue;
+    setVal(it.id, clamp(v, it.min, it.max));
+    touched = true;
+  }
+  const view = q.get("view");
+  if(view === "analysis" || view === "sim3d"){
+    const tab = document.querySelector('.tab[data-view="'+view+'"]');
+    if(tab) tab.click();
+  }
+  if(touched){ restart(); recompute(); }
+})();
 
 document.getElementById("decide").addEventListener("change", e=>{
   sens.decider = e.target.value;
